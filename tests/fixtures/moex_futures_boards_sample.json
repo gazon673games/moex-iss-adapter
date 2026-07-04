@@ -1,0 +1,41 @@
+{
+  "boards": {
+    "columns": [
+      "id",
+      "board_group_id",
+      "boardid",
+      "title",
+      "is_traded"
+    ],
+    "data": [
+      [
+        101,
+        45,
+        "RFUD",
+        "Фьючерсы",
+        1
+      ]
+    ],
+    "metadata": {
+      "board_group_id": {
+        "type": "int32"
+      },
+      "boardid": {
+        "bytes": 12,
+        "max_size": 0,
+        "type": "string"
+      },
+      "id": {
+        "type": "int32"
+      },
+      "is_traded": {
+        "type": "int32"
+      },
+      "title": {
+        "bytes": 381,
+        "max_size": 0,
+        "type": "string"
+      }
+    }
+  }
+}

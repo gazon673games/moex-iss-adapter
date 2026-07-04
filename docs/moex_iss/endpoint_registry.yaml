@@ -1,0 +1,84 @@
+base_url: "https://iss.moex.com/iss"
+
+endpoints:
+  candles:
+    description: "Get candle data for a security."
+    path: "/engines/{engine}/markets/{market}/boards/{board}/securities/{security}/candles.json"
+    required_path_params:
+      - engine
+      - market
+      - board
+      - security
+    query_params:
+      from: "YYYY-MM-DD"
+      till: "YYYY-MM-DD"
+      interval: "MOEX candle interval"
+      start: "pagination offset"
+    default_mvp:
+      engine: "stock"
+      market: "shares"
+      board: "TQBR"
+      security: "SBER"
+      timeframe: "1d"
+
+  engines:
+    description: "List available MOEX engines."
+    path: "/engines.json"
+
+  markets:
+    description: "List markets for an engine."
+    path: "/engines/{engine}/markets.json"
+
+  boards:
+    description: "List boards for an engine and market."
+    path: "/engines/{engine}/markets/{market}/boards.json"
+
+  securities:
+    description: "List securities for an engine, market, and board."
+    path: "/engines/{engine}/markets/{market}/boards/{board}/securities.json"
+
+  market_securities:
+    description: "List securities for an engine and market."
+    path: "/engines/{engine}/markets/{market}/securities.json"
+
+  securities_columns:
+    description: "List securities table column metadata for an engine and market."
+    path: "/engines/{engine}/markets/{market}/securities/columns.json"
+
+  futures_securities:
+    description: "List available MOEX futures securities for FORTS."
+    path: "/engines/futures/markets/forts/securities.json"
+    default_mvp:
+      engine: "futures"
+      market: "forts"
+
+  futures_securities_columns:
+    description: "List MOEX futures securities column metadata."
+    path: "/engines/futures/markets/forts/securities/columns.json"
+
+  futures_boards:
+    description: "List MOEX futures boards for FORTS."
+    path: "/engines/futures/markets/forts/boards.json"
+
+  futures_board_candles:
+    description: "Get candle data for a concrete futures contract on a board."
+    path: "/engines/futures/markets/forts/boards/{board}/securities/{security}/candles.json"
+    required_path_params:
+      - board
+      - security
+    query_params:
+      from: "YYYY-MM-DD"
+      till: "YYYY-MM-DD"
+      interval: "MOEX candle interval"
+      start: "pagination offset"
+
+  futures_market_candles:
+    description: "Get candle data for a concrete futures contract at market level."
+    path: "/engines/futures/markets/forts/securities/{security}/candles.json"
+    required_path_params:
+      - security
+    query_params:
+      from: "YYYY-MM-DD"
+      till: "YYYY-MM-DD"
+      interval: "MOEX candle interval"
+      start: "pagination offset"

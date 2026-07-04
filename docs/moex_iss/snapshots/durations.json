@@ -1,0 +1,83 @@
+{
+  "durations": {
+    "columns": [
+      "interval",
+      "duration",
+      "days",
+      "title",
+      "hint"
+    ],
+    "data": [
+      [
+        1,
+        60,
+        null,
+        "минута",
+        "1м"
+      ],
+      [
+        10,
+        600,
+        null,
+        "10 минут",
+        "10м"
+      ],
+      [
+        60,
+        3600,
+        null,
+        "час",
+        "1ч"
+      ],
+      [
+        24,
+        86400,
+        null,
+        "день",
+        "1д"
+      ],
+      [
+        7,
+        604800,
+        null,
+        "неделя",
+        "1н"
+      ],
+      [
+        31,
+        2678400,
+        null,
+        "месяц",
+        "1М"
+      ],
+      [
+        4,
+        8035200,
+        null,
+        "квартал",
+        "1К"
+      ]
+    ],
+    "metadata": {
+      "days": {
+        "type": "int32"
+      },
+      "duration": {
+        "type": "int32"
+      },
+      "hint": {
+        "bytes": 765,
+        "max_size": 0,
+        "type": "string"
+      },
+      "interval": {
+        "type": "int32"
+      },
+      "title": {
+        "bytes": 765,
+        "max_size": 0,
+        "type": "string"
+      }
+    }
+  }
+}

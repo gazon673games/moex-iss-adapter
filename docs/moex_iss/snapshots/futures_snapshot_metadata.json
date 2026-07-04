@@ -1,0 +1,30 @@
+{
+  "candles": {
+    "from": "2023-01-10",
+    "params": {
+      "from": "2023-01-10",
+      "interval": 24,
+      "start": 0,
+      "till": "2023-01-20"
+    },
+    "path": "/engines/futures/markets/forts/securities/CNYRUBF/candles.json",
+    "till": "2023-01-20"
+  },
+  "metadata_snapshot_ts": "2026-07-04T07:43:49",
+  "normalized_metadata_path": "docs\\moex_iss\\snapshots\\normalized\\metadata\\exchange=MOEX\\engine=futures\\market=forts\\securities\\snapshot_ts=20260704T074349Z\\part-000.parquet",
+  "raw_metadata_path": "docs\\moex_iss\\snapshots\\raw\\moex\\metadata\\engine=futures\\market=forts\\securities\\snapshot_ts=20260704T074349Z.json",
+  "selected_security": {
+    "assetcode": "CNYRUBTOM",
+    "boardid": "RFUD",
+    "lastdeldate": "2100-01-01",
+    "lasttradedate": "2100-01-01",
+    "latname": "CNYRUBF",
+    "lotvolume": 1000.0,
+    "prevopenposition": 17745514.0,
+    "secid": "CNYRUBF",
+    "secname": "CNYRUBF",
+    "sectype": "CN",
+    "shortname": "CNYRUBF"
+  },
+  "selection_note": "selected CNY/RUB-related CNYRUBF contract"
+}

@@ -1,0 +1,30 @@
+{
+  "candles": {
+    "columns": [
+      "begin",
+      "open",
+      "close",
+      "high",
+      "low",
+      "value",
+      "volume",
+      "end"
+    ],
+    "data": [],
+    "metadata": {}
+  },
+  "candles.cursor": {
+    "columns": [
+      "INDEX",
+      "TOTAL",
+      "PAGESIZE"
+    ],
+    "data": [
+      [
+        0,
+        0,
+        100
+      ]
+    ]
+  }
+}
