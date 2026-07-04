@@ -9,6 +9,9 @@ from moex_iss_adapter.futures import parse_futures_securities
 from moex_iss_adapter.metadata import normalize_futures_metadata
 from moex_iss_adapter.models import (
     DownloadResult,
+    FuturesBulkResult,
+    FuturesBulkSkip,
+    FuturesChainContract,
     MetadataQualityReport,
     MetadataSnapshotResult,
     QualityReport,
@@ -141,3 +144,78 @@ def test_cli_exposes_futures_candles_subcommand(monkeypatch) -> None:
     assert "symbol: CNYRUBF" in result.output
     assert "board: RFUD" in result.output
     assert "quality status: passed" in result.output
+
+
+def test_cli_exposes_futures_prepare_chain_data_subcommand(monkeypatch, tmp_path) -> None:
+    def fake_prepare_futures_chain_data(**kwargs) -> FuturesBulkResult:
+        download = DownloadResult(
+            symbol="CNYRUBF",
+            engine="futures",
+            market="forts",
+            board="RFUD",
+            timeframe=kwargs["timeframe"],
+            from_date=kwargs["from_date"],
+            till_date=kwargs["till_date"],
+            row_count=1,
+            min_ts=datetime(2023, 1, 10),
+            max_ts=datetime(2023, 1, 10),
+            raw_path=None,
+            normalized_path=tmp_path / "part-000.parquet",
+            quality_report=_quality_report(),
+        )
+        return FuturesBulkResult(
+            metadata_snapshot=MetadataSnapshotResult(
+                engine="futures",
+                market="forts",
+                row_count=2,
+                snapshot_ts=datetime(2026, 7, 4, 12, 30, 45),
+                raw_path=None,
+                normalized_path=tmp_path / "metadata.parquet",
+                quality_report=MetadataQualityReport(
+                    passed=True,
+                    row_count=2,
+                    duplicate_count=0,
+                    issues=[],
+                ),
+            ),
+            contracts_found=2,
+            selected_contracts=[
+                FuturesChainContract(secid="CNYRUBF", board="RFUD"),
+                FuturesChainContract(secid="CRU6", board="RFUD"),
+            ],
+            download_results=[download],
+            skipped_contracts=[
+                FuturesBulkSkip(secid="CRU6", board="RFUD", reason="no candle rows")
+            ],
+        )
+
+    monkeypatch.setattr(
+        "moex_iss_adapter.cli.futures.prepare_futures_chain_data",
+        fake_prepare_futures_chain_data,
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "futures",
+            "prepare-chain-data",
+            "--query",
+            "CNY",
+            "--timeframe",
+            "1d",
+            "--from-date",
+            "2023-01-10",
+            "--till-date",
+            "2023-01-20",
+            "--data-root",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "metadata_snapshot_ts: 20260704T123045Z" in result.output
+    assert "contracts_downloaded: 1" in result.output
+    assert "rows_total: 1" in result.output
+    assert "CRU6@RFUD: no candle rows" in result.output
+    assert "CNYRUBF@RFUD: passed" in result.output

@@ -6,6 +6,7 @@ from moex_iss_adapter.downloader import (
     download_futures_candles,
     fetch_currency_securities,
     fetch_futures_securities,
+    prepare_futures_chain_data,
     save_futures_metadata_snapshot,
     search_currency_securities,
     search_futures_securities,
@@ -13,6 +14,7 @@ from moex_iss_adapter.downloader import (
 )
 from moex_iss_adapter.models import (
     DownloadResult,
+    FuturesBulkResult,
     MetadataSnapshotInfo,
     MetadataSnapshotResult,
     MoexIssConfig,
@@ -21,6 +23,7 @@ from moex_iss_adapter.models import (
 
 __all__ = [
     "DownloadResult",
+    "FuturesBulkResult",
     "MetadataSnapshotInfo",
     "MetadataSnapshotResult",
     "MoexIssConfig",
@@ -30,6 +33,7 @@ __all__ = [
     "download_futures_candles",
     "fetch_currency_securities",
     "fetch_futures_securities",
+    "prepare_futures_chain_data",
     "save_futures_metadata_snapshot",
     "search_currency_securities",
     "search_saved_futures_metadata",

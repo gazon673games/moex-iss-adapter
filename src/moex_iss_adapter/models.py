@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -156,3 +156,69 @@ class MetadataSnapshotInfo(AdapterBaseModel):
     snapshot_ts: str
     parquet_path: Path
     row_count: int | None = None
+
+
+class FuturesChainContract(AdapterBaseModel):
+    """Concrete futures contract selected from normalized metadata."""
+
+    secid: str
+    board: str
+    shortname: str | None = None
+    secname: str | None = None
+    assetcode: str | None = None
+    last_trade_date: date | None = None
+    expiration_date: date | None = None
+
+
+class FuturesBulkSkip(AdapterBaseModel):
+    """One futures contract or candidate skipped during bulk preparation."""
+
+    secid: str | None = None
+    board: str | None = None
+    reason: str
+
+
+class FuturesChainSelection(AdapterBaseModel):
+    """Metadata filtering result for a futures chain preparation run."""
+
+    contracts_found: int
+    contracts: list[FuturesChainContract] = Field(default_factory=list)
+    skipped: list[FuturesBulkSkip] = Field(default_factory=list)
+
+
+class FuturesBulkResult(AdapterBaseModel):
+    """End-to-end result for futures bulk candle preparation."""
+
+    metadata_snapshot: MetadataSnapshotResult
+    contracts_found: int
+    selected_contracts: list[FuturesChainContract] = Field(default_factory=list)
+    download_results: list[DownloadResult] = Field(default_factory=list)
+    skipped_contracts: list[FuturesBulkSkip] = Field(default_factory=list)
+
+    @property
+    def metadata_snapshot_ts(self) -> datetime:
+        return self.metadata_snapshot.snapshot_ts
+
+    @property
+    def contracts_selected(self) -> int:
+        return len(self.selected_contracts)
+
+    @property
+    def contracts_downloaded(self) -> int:
+        return len(self.download_results)
+
+    @property
+    def contracts_skipped(self) -> int:
+        return len(self.skipped_contracts)
+
+    @property
+    def rows_total(self) -> int:
+        return sum(result.row_count for result in self.download_results)
+
+    @property
+    def normalized_paths(self) -> list[Path]:
+        return [
+            result.normalized_path
+            for result in self.download_results
+            if result.normalized_path is not None
+        ]
