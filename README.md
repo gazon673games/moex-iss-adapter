@@ -1,23 +1,27 @@
 # moex_iss_adapter
 
-`moex_iss_adapter` is a standalone adapter for fetching MOEX ISS candle data,
-preserving raw responses, normalizing candles to one canonical OHLCV schema,
-saving normalized data as Parquet, and running adapter-level quality checks.
+Standalone adapter for MOEX ISS market data inside `ohlcv-replay`.
 
-## Supported MVP Scope
+The adapter fetches MOEX ISS responses, preserves raw JSON, normalizes candles
+to one canonical OHLCV schema, writes Parquet, and runs adapter-level quality
+checks. It is not a backtest engine.
 
-- Source: MOEX ISS only.
-- Data type: candles only.
-- Primary validation scenario: `stock` / `shares` / `TQBR` / `SBER` / `1d`.
-- Futures discovery and candles: `futures` / `forts` for concrete futures
-  contract SECIDs.
-- Currency discovery and candles: `currency` / `selt` for concrete currency
-  SECIDs.
+## Supported Scope
+
+- Source: MOEX ISS.
+- Data type: candles.
+- Primary stock scenario: `stock` / `shares` / `TQBR` / `SBER` / `1d`.
+- Futures: discovery and candles for concrete `futures` / `forts` SECIDs.
+- Currency: discovery and candles for concrete `currency` / `selt` SECIDs.
 - Storage: local files under `data/raw` and `data/normalized`.
 
-The adapter is not a backtest engine and does not contain strategies, order
-simulation, portfolio accounting, visualization, a web API, or database/server
-infrastructure.
+Unsupported: strategies, signals, order simulation, portfolio accounting,
+visualization, web APIs, and server/database orchestration.
+
+Architecture notes:
+
+- `docs/architecture/adapter_scope.md`
+- `docs/architecture/adapter_v0_1_audit.md`
 
 ## Setup
 
@@ -25,42 +29,31 @@ infrastructure.
 uv sync --extra dev
 ```
 
-If using pip directly:
-
 ```bash
 python -m pip install -e ".[dev]"
 ```
 
-## Official MOEX ISS Sources
-
-Local source notes live in `docs/moex_iss/sources.md`.
+## MOEX ISS Sources
 
 - Official ISS reference: https://iss.moex.com/iss/reference/
-- Official MOEX ISS developer manual: https://www.moex.com/en/documents/8888
-- Official ISS service description: https://www.moex.com/a2920
+- MOEX ISS developer manual: https://www.moex.com/en/documents/8888
+- ISS service description: https://www.moex.com/a2920
+- Local notes: `docs/moex_iss/sources.md`
+- Endpoint registry: `docs/moex_iss/endpoint_registry.yaml`
 
-The MVP endpoint registry is documented in
-`docs/moex_iss/endpoint_registry.yaml`.
-
-## Snapshot Script
-
-Small MOEX ISS samples can be refreshed with:
+Refresh checked-in samples:
 
 ```bash
 uv run python scripts/snapshot_moex_iss.py
 ```
 
-The script fetches only small deterministic samples: engines, stock markets,
-stock/shares boards, ISS durations, SBER/TQBR daily candles for `2023-01-10`
-through `2023-01-20`, futures/forts boards, futures securities columns, a small
-futures securities sample, and a small futures candle sample when a suitable
-contract is available. Checked-in tests use minimal fixtures that match the
-MOEX ISS `columns` plus `data` response shape, so default tests do not require
-network access.
+The snapshot script fetches small deterministic samples for engines, markets,
+boards, SBER candles, futures metadata/candles, and currency metadata/candles.
+Default tests use fixtures and do not require network access.
 
-## CLI Usage
+## CLI
 
-Stock/share candle download:
+Stock/share candles:
 
 ```bash
 uv run moex-iss candles \
@@ -75,21 +68,10 @@ uv run moex-iss candles \
   --save-normalized
 ```
 
-The CLI prints a compact summary: symbol, board, timeframe, requested range,
-row count, min/max timestamp, raw path, normalized path, and quality status.
-
-Futures discovery:
+Futures discovery and candles:
 
 ```bash
 uv run moex-iss futures search --query CNY
-```
-
-The search output is compact and includes `SECID`, `SHORTNAME`, `SECNAME`,
-`BOARDID`, `ASSETCODE`, and last trade date when MOEX provides them.
-
-Futures candle download for one concrete discovered SECID:
-
-```bash
 uv run moex-iss futures candles \
   --symbol CNYRUBF \
   --timeframe 1d \
@@ -99,24 +81,11 @@ uv run moex-iss futures candles \
   --save-normalized
 ```
 
-`--board` may be supplied explicitly, for example `--board RFUD`. If omitted,
-the adapter discovers the board from MOEX futures securities metadata and uses
-the market-level candle endpoint where available.
-
-Currency discovery:
+Currency discovery and candles:
 
 ```bash
 uv run moex-iss currency search --query CNY
 uv run moex-iss currency search --query USD
-uv run moex-iss currency search --query RUB
-```
-
-Currency SECIDs can differ from intuitive pair names, so discover the concrete
-instrument first and then download candles for that SECID.
-
-Currency candle download:
-
-```bash
 uv run moex-iss currency candles \
   --symbol <DISCOVERED_CURRENCY_SECID> \
   --timeframe 1d \
@@ -126,113 +95,57 @@ uv run moex-iss currency candles \
   --save-normalized
 ```
 
-`--board` may be supplied explicitly, for example `--board CETS`. If omitted,
-the adapter discovers the board from MOEX currency securities metadata and uses
+For futures and currency candles, `--board` may be supplied explicitly. If it
+is omitted, the adapter discovers `BOARDID` from current MOEX metadata and uses
 the market-level candle endpoint where available.
 
-Futures metadata snapshot:
+Futures metadata snapshots:
 
 ```bash
-uv run moex-iss futures snapshot \
-  --save-raw \
-  --save-normalized
-```
-
-List saved normalized metadata snapshots:
-
-```bash
+uv run moex-iss futures snapshot --save-raw --save-normalized
 uv run moex-iss metadata snapshots --data-root data
-```
-
-Filter the list to futures/FORTS snapshots:
-
-```bash
-uv run moex-iss metadata snapshots \
-  --engine futures \
-  --market forts
-```
-
-Search from a saved normalized metadata snapshot instead of live MOEX ISS:
-
-```bash
 uv run moex-iss futures search \
   --query CNY \
   --metadata-path <path printed by metadata snapshots>
 ```
 
-Saved metadata search supports `--query`, `--secid`, `--short-name`,
-`--security-name`, and `--asset-code`.
+The CLI prints compact summaries: identifiers, requested range, row count,
+min/max timestamp, output paths, and quality status.
 
 ## Storage Layout
 
-Raw MOEX responses are saved without destructive transformation:
+Raw candles are saved without destructive transformation:
 
 ```text
-data/
-  raw/
-    moex/
-      candles/
-        engine=stock/
-          market=shares/
-            board=TQBR/
-              symbol=SBER/
-                timeframe=1d/
-                  from=2020-01-01_till=2024-12-31.json
+data/raw/moex/candles/
+  engine=stock/market=shares/board=TQBR/symbol=SBER/timeframe=1d/
+    from=2020-01-01_till=2024-12-31.json
 ```
 
 Normalized candles are saved as Parquet:
 
 ```text
-data/
-  normalized/
-    candles/
-      exchange=MOEX/
-        engine=stock/
-          market=shares/
-            board=TQBR/
-              symbol=SBER/
-                timeframe=1d/
-                  part-000.parquet
+data/normalized/candles/
+  exchange=MOEX/engine=stock/market=shares/board=TQBR/symbol=SBER/timeframe=1d/
+    part-000.parquet
 ```
 
-Futures candles use the same storage layout with `engine=futures`,
-`market=forts`, the discovered or supplied futures board, and the concrete
-futures SECID as `symbol`.
+Futures and currency candles use the same layout with their own `engine`,
+`market`, discovered or supplied `board`, and concrete SECID as `symbol`.
 
-Currency candles use the same storage layout with `engine=currency`,
-`market=selt`, the discovered or supplied currency board, and the concrete
-currency SECID as `symbol`.
-
-Raw futures metadata snapshots are saved separately:
+Futures metadata snapshots:
 
 ```text
-data/
-  raw/
-    moex/
-      metadata/
-        engine=futures/
-          market=forts/
-            securities/
-              snapshot_ts=20260704T123045Z.json
-```
+data/raw/moex/metadata/engine=futures/market=forts/securities/
+  snapshot_ts=20260704T123045Z.json
 
-Normalized futures metadata snapshots are saved as Parquet:
-
-```text
-data/
-  normalized/
-    metadata/
-      exchange=MOEX/
-        engine=futures/
-          market=forts/
-            securities/
-              snapshot_ts=20260704T123045Z/
-                part-000.parquet
+data/normalized/metadata/exchange=MOEX/engine=futures/market=forts/securities/
+  snapshot_ts=20260704T123045Z/part-000.parquet
 ```
 
 ## Canonical OHLCV Schema
 
-Normalized candle data always uses this exact column order:
+Normalized candle columns:
 
 ```text
 source
@@ -252,20 +165,11 @@ value
 currency
 ```
 
-The normalized timestamp column is `ts`. Raw MOEX `begin` is allowed only in raw
-response parsing and fixtures.
-
-Futures metadata such as `ASSETCODE`, `SHORTNAME`, `SECNAME`, `LASTTRADEDATE`,
-and `LASTDELDATE` is discovery metadata. It is not added to the canonical OHLCV
-schema.
-
-Currency metadata such as `FACEUNIT`, `CURRENCYID`, `LOTSIZE`, and `SETTLEDATE`
-is discovery metadata or raw-response data. It is not added to the canonical
-OHLCV schema.
+The normalized timestamp column is always `ts`. Raw MOEX `begin` is allowed
+only in raw response parsing and fixtures. Futures and currency discovery fields
+stay in metadata/raw responses and are not added to canonical OHLCV rows.
 
 ## Futures Metadata Schema
-
-Normalized futures metadata uses this stable schema:
 
 ```text
 source
@@ -286,12 +190,7 @@ raw_metadata
 snapshot_ts
 ```
 
-`snapshot_ts` records when the metadata snapshot was created. `raw_metadata`
-contains the original MOEX row as JSON text for reproducibility.
-
 ## Tests
-
-Default tests do not require network access:
 
 ```bash
 uv run ruff check .
@@ -299,29 +198,25 @@ uv run ruff format --check .
 uv run pytest tests/unit tests/contract
 ```
 
-Integration tests are isolated behind a marker:
-
 ```bash
 uv run pytest tests/integration -m integration
 ```
 
-## Known MVP Limitations
+## Known Limitations
 
 - MOEX ISS only.
 - Candles only.
-- Primary scenario: `stock` / `shares` / `TQBR`.
-- Primary validation symbol: `SBER`.
 - Primary timeframe: `1d`.
-- Futures support downloads concrete expiring futures contracts only.
-- Currency support downloads concrete `currency/selt` instruments only.
-- No continuous futures stitching.
-- No back-adjusted futures series.
-- No futures roll rules.
-- No open interest analytics.
-- No futures margin or settlement modeling.
-- No corporate actions.
-- No dividend adjustment.
+- Futures support concrete expiring contracts only.
+- Currency support concrete `currency/selt` instruments only.
+- No continuous futures stitching or roll rules.
+- No corporate action or dividend adjustment.
 - No survivorship-bias-free universe.
-- No backtest engine.
-- No visualization layer.
-- No web API.
+
+## Explicitly Out Of Scope
+
+- Continuous futures construction and back-adjustment.
+- Equity universe construction.
+- Cross-adapter `data_store` infrastructure.
+- Backtesting, strategies, execution, PnL, and portfolio simulation.
+- Visualization, web APIs, and database/server orchestration.
