@@ -20,6 +20,8 @@ BOARDS_PATH_TEMPLATE = "/engines/{engine}/markets/{market}/boards.json"
 MARKET_SECURITIES_PATH_TEMPLATE = "/engines/{engine}/markets/{market}/securities.json"
 SECURITIES_COLUMNS_PATH_TEMPLATE = "/engines/{engine}/markets/{market}/securities/columns.json"
 SECURITIES_PATH_TEMPLATE = "/engines/{engine}/markets/{market}/boards/{board}/securities.json"
+GLOBAL_SECURITIES_SEARCH_PATH = "/securities.json"
+GLOBAL_SECURITY_DETAILS_PATH_TEMPLATE = "/securities/{security}.json"
 
 
 def _require_path_value(name: str, value: str) -> str:
@@ -91,6 +93,16 @@ def build_securities_path(engine: str, market: str, board: str) -> str:
         engine=_require_path_value("engine", engine),
         market=_require_path_value("market", market),
         board=_require_path_value("board", board),
+    )
+
+
+def build_global_securities_search_path() -> str:
+    return GLOBAL_SECURITIES_SEARCH_PATH
+
+
+def build_global_security_details_path(security: str) -> str:
+    return GLOBAL_SECURITY_DETAILS_PATH_TEMPLATE.format(
+        security=_require_path_value("security", security),
     )
 
 

@@ -52,6 +52,20 @@ endpoints:
       engine: "futures"
       market: "forts"
 
+  global_securities_search:
+    description: "Search all MOEX securities; used to find current and expired FORTS futures candidates by query."
+    path: "/securities.json"
+    query_params:
+      q: "Search text"
+      start: "pagination offset"
+      iss.only: "Optional table selector, for example securities"
+
+  global_security_details:
+    description: "Fetch metadata and board details for one MOEX security, including expired futures when available."
+    path: "/securities/{security}.json"
+    required_path_params:
+      - security
+
   futures_securities_columns:
     description: "List MOEX futures securities column metadata."
     path: "/engines/futures/markets/forts/securities/columns.json"
@@ -81,6 +95,43 @@ endpoints:
       from: "YYYY-MM-DD"
       till: "YYYY-MM-DD"
       interval: "MOEX candle interval"
+      start: "pagination offset"
+
+  futures_history_market_securities:
+    description: "Historical FORTS market rows for a date; useful for probing history but not a compact expired contract calendar."
+    path: "/history/engines/futures/markets/forts/securities.json"
+    query_params:
+      date: "YYYY-MM-DD"
+      start: "pagination offset"
+
+  futures_history_board_securities:
+    description: "Historical FORTS board rows for a date; useful for probing history but not a compact expired contract calendar."
+    path: "/history/engines/futures/markets/forts/boards/{board}/securities.json"
+    required_path_params:
+      - board
+    query_params:
+      date: "YYYY-MM-DD"
+      start: "pagination offset"
+
+  futures_history_market_security:
+    description: "Historical rows for one futures SECID at market level."
+    path: "/history/engines/futures/markets/forts/securities/{security}.json"
+    required_path_params:
+      - security
+    query_params:
+      from: "YYYY-MM-DD"
+      till: "YYYY-MM-DD"
+      start: "pagination offset"
+
+  futures_history_board_security:
+    description: "Historical rows for one futures SECID on a board."
+    path: "/history/engines/futures/markets/forts/boards/{board}/securities/{security}.json"
+    required_path_params:
+      - board
+      - security
+    query_params:
+      from: "YYYY-MM-DD"
+      till: "YYYY-MM-DD"
       start: "pagination offset"
 
   currency_securities:

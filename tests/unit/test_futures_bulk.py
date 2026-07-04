@@ -10,6 +10,7 @@ from moex_iss_adapter.downloads.futures_bulk import (
     prepare_futures_chain_data,
     select_futures_chain_contracts,
 )
+from moex_iss_adapter.exceptions import MoexIssAdapterError
 from moex_iss_adapter.metadata import normalize_futures_metadata
 from moex_iss_adapter.models import (
     FuturesBulkSkip,
@@ -22,9 +23,15 @@ SNAPSHOT_TS = datetime(2026, 7, 4, 12, 30, 45)
 
 
 class FakeBulkFuturesClient:
-    def __init__(self, securities_response: dict, pages_by_symbol: dict[str, list[dict]]) -> None:
+    def __init__(
+        self,
+        securities_response: dict,
+        pages_by_symbol: dict[str, list[dict]],
+        details_by_symbol: dict[str, dict] | None = None,
+    ) -> None:
         self.securities_response = securities_response
         self.pages_by_symbol = pages_by_symbol
+        self.details_by_symbol = details_by_symbol or {}
         self.requested_symbols: list[str] = []
 
     def get_market_securities(self, engine: str, market: str) -> dict:
@@ -39,6 +46,13 @@ class FakeBulkFuturesClient:
         if len(pages) == 1:
             return pages[0]
         return pages.pop(0)
+
+    def get_security_details(self, security: str) -> dict:
+        try:
+            return self.details_by_symbol[security]
+        except KeyError as exc:
+            msg = f"No fixture details for {security}"
+            raise MoexIssAdapterError(msg) from exc
 
 
 def test_selects_futures_metadata_by_query(futures_securities_response: dict) -> None:
@@ -62,6 +76,18 @@ def test_include_and_exclude_secid_filters(futures_securities_response: dict) ->
     )
 
     assert [contract.secid for contract in selection.contracts] == ["CRU6"]
+
+
+def test_secid_prefix_cr_filters_only_cr_family(futures_securities_response: dict) -> None:
+    frame = normalize_futures_metadata(futures_securities_response, snapshot_ts=SNAPSHOT_TS)
+
+    selection = select_futures_chain_contracts(frame, query="cny", secid_prefix="CR")
+
+    assert selection.contracts
+    assert all(contract.secid.startswith("CR") for contract in selection.contracts)
+    assert {"MYU6", "UCU6", "CNYRUBF"}.isdisjoint(
+        {contract.secid for contract in selection.contracts}
+    )
 
 
 def test_limit_behavior_reports_unselected_contracts(futures_securities_response: dict) -> None:
@@ -213,6 +239,68 @@ def test_no_empty_normalized_parquet_is_written_for_no_row_contract(
     assert result.skipped_contracts[0].reason == "no_rows"
     assert raw_candle_files
     assert not candle_root.exists()
+
+
+def test_manual_include_secid_downloads_without_metadata_row(
+    futures_securities_response: dict,
+    futures_candles_response: dict,
+    empty_candles_response: dict,
+    tmp_path,
+) -> None:
+    client = FakeBulkFuturesClient(
+        futures_securities_response,
+        pages_by_symbol={"CRH5": [futures_candles_response, empty_candles_response]},
+    )
+
+    result = prepare_futures_chain_data(
+        include_secids=["CRH5"],
+        from_date="2025-01-01",
+        till_date="2025-03-31",
+        save_normalized=True,
+        data_root=tmp_path,
+        overwrite=True,
+        client=client,  # type: ignore[arg-type]
+        config=MoexIssConfig(max_pages=10),
+    )
+
+    assert result.contracts_selected == 1
+    assert result.selected_contracts[0].secid == "CRH5"
+    assert result.selected_contracts[0].metadata_found is False
+    assert result.download_results[0].symbol == "CRH5"
+    assert result.download_results[0].row_count == len(futures_candles_response["candles"]["data"])
+
+
+def test_no_row_expired_manual_secid_reports_status_without_empty_parquet(
+    futures_securities_response: dict,
+    empty_candles_response: dict,
+    tmp_path,
+) -> None:
+    client = FakeBulkFuturesClient(
+        futures_securities_response,
+        pages_by_symbol={"CRH5": [empty_candles_response]},
+    )
+
+    result = prepare_futures_chain_data(
+        include_secids=["CRH5"],
+        from_date="2025-01-01",
+        till_date="2025-03-31",
+        save_raw=True,
+        save_normalized=True,
+        data_root=tmp_path,
+        overwrite=True,
+        client=client,  # type: ignore[arg-type]
+        config=MoexIssConfig(max_pages=10),
+    )
+
+    skipped = result.skipped_contracts[0]
+    assert result.contracts_downloaded == 0
+    assert skipped.secid == "CRH5"
+    assert skipped.reason == "no_rows"
+    assert skipped.metadata_found is False
+    assert skipped.candles_found is False
+    assert skipped.row_count == 0
+    assert not (tmp_path / "normalized" / "candles").exists()
+    assert list((tmp_path / "raw" / "moex" / "candles").rglob("*.json"))
 
 
 def test_min_successful_contracts_passes(

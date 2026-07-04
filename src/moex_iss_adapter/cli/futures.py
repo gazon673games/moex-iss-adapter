@@ -26,8 +26,10 @@ from moex_iss_adapter.downloads.futures_bulk import (
     format_futures_bulk_summary,
     prepare_futures_chain_data,
 )
+from moex_iss_adapter.downloads.futures_history import search_historical_futures_contracts
 from moex_iss_adapter.downloads.futures_metadata import save_futures_metadata_snapshot
 from moex_iss_adapter.exceptions import MoexIssAdapterError
+from moex_iss_adapter.futures_history import contract_is_expired
 from moex_iss_adapter.models import FuturesBulkResult
 
 futures_app = typer.Typer(help="MOEX futures discovery and candle commands.")
@@ -35,6 +37,7 @@ futures_app = typer.Typer(help="MOEX futures discovery and candle commands.")
 
 def _print_prepare_chain_data_result(result: FuturesBulkResult) -> None:
     summary = format_futures_bulk_summary(result)
+    selected_by_secid = {contract.secid: contract for contract in result.selected_contracts}
     typer.echo(f"metadata_snapshot_ts: {summary['metadata_snapshot_ts']}")
     typer.echo(f"contracts_found: {summary['contracts_found']}")
     typer.echo(f"contracts_selected: {summary['contracts_selected']}")
@@ -47,8 +50,11 @@ def _print_prepare_chain_data_result(result: FuturesBulkResult) -> None:
     typer.echo("downloaded_contracts:")
     if result.download_results:
         for download in result.download_results:
+            contract = selected_by_secid.get(download.symbol)
             typer.echo(f"- secid: {download.symbol}")
             typer.echo(f"  board: {download.board}")
+            typer.echo(f"  metadata_found: {contract.metadata_found if contract else None}")
+            typer.echo("  candles_found: True")
             typer.echo(f"  from_date_used: {download.from_date}")
             typer.echo(f"  till_date_used: {download.till_date}")
             typer.echo(f"  row_count: {download.row_count}")
@@ -65,6 +71,9 @@ def _print_prepare_chain_data_result(result: FuturesBulkResult) -> None:
             if skipped.board:
                 label = f"{label}@{skipped.board}"
             typer.echo(f"- {label}: {skipped.reason}")
+            typer.echo(f"  metadata_found: {skipped.metadata_found}")
+            typer.echo(f"  candles_found: {skipped.candles_found}")
+            typer.echo(f"  row_count: {skipped.row_count}")
     else:
         typer.echo("- none")
 
@@ -91,6 +100,10 @@ def futures_search(
         str | None,
         typer.Option("--asset-code", help="Filter by ASSETCODE"),
     ] = None,
+    secid_prefix: Annotated[
+        str | None,
+        typer.Option("--secid-prefix", help="Keep SECIDs starting with this prefix"),
+    ] = None,
     short_name: Annotated[
         str | None,
         typer.Option("--short-name", help="Filter by SHORTNAME"),
@@ -103,6 +116,10 @@ def futures_search(
         Path | None,
         typer.Option("--metadata-path", help="Saved normalized metadata Parquet snapshot"),
     ] = None,
+    include_expired: Annotated[
+        bool,
+        typer.Option("--include-expired", help="Search global ISS securities for expired futures"),
+    ] = False,
     limit: Annotated[int, typer.Option("--limit", min=1, help="Maximum rows to print")] = 25,
     verbose: Annotated[bool, typer.Option("--verbose")] = False,
 ) -> None:
@@ -110,32 +127,74 @@ def futures_search(
 
     configure_logging(verbose)
     try:
-        results = (
-            search_saved_futures_metadata(
-                metadata_path=metadata_path,
-                query=query,
-                secid=secid,
+        if include_expired:
+            results = search_historical_futures_contracts(
+                query=query or secid or asset_code or secid_prefix or "",
+                secid_prefix=secid_prefix,
                 asset_code=asset_code,
-                short_name=short_name,
-                security_name=security_name,
             )
-            if metadata_path is not None
-            else search_futures_securities(
-                query=query,
-                secid=secid,
-                asset_code=asset_code,
-                short_name=short_name,
-                security_name=security_name,
-                engine=DEFAULT_FUTURES_ENGINE,
-                market=DEFAULT_FUTURES_MARKET,
+            if secid:
+                results = [
+                    contract
+                    for contract in results
+                    if secid.casefold() in contract.secid.casefold()
+                ]
+        else:
+            results = (
+                search_saved_futures_metadata(
+                    metadata_path=metadata_path,
+                    query=query,
+                    secid=secid,
+                    asset_code=asset_code,
+                    short_name=short_name,
+                    security_name=security_name,
+                )
+                if metadata_path is not None
+                else search_futures_securities(
+                    query=query,
+                    secid=secid,
+                    asset_code=asset_code,
+                    short_name=short_name,
+                    security_name=security_name,
+                    engine=DEFAULT_FUTURES_ENGINE,
+                    market=DEFAULT_FUTURES_MARKET,
+                )
             )
-        )
+            if secid_prefix:
+                results = [
+                    security
+                    for security in results
+                    if security.secid.upper().startswith(secid_prefix.upper())
+                ]
     except MoexIssAdapterError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
     if not results:
         typer.echo("No futures securities matched the search.")
+        return
+
+    if include_expired:
+        typer.echo(
+            "SECID | BOARD | SHORTNAME | SECNAME | ASSETCODE | EXPIRATION_DATE | "
+            "LAST_TRADE_DATE | IS_EXPIRED | SOURCE_ENDPOINT"
+        )
+        for contract in results[:limit]:
+            typer.echo(
+                " | ".join(
+                    (
+                        contract.secid,
+                        contract.board,
+                        contract.shortname or "",
+                        contract.secname or "",
+                        contract.assetcode or "",
+                        str(contract.expiration_date or ""),
+                        str(contract.last_trade_date or ""),
+                        str(contract_is_expired(contract)),
+                        contract.source_endpoint or "",
+                    )
+                )
+            )
         return
 
     typer.echo("SECID | SHORTNAME | SECNAME | BOARDID | ASSETCODE | LASTTRADEDATE")
@@ -216,6 +275,10 @@ def futures_prepare_chain_data(
         Path | None,
         typer.Option("--metadata-path", help="Reuse a saved normalized metadata Parquet snapshot"),
     ] = None,
+    include_expired: Annotated[
+        bool,
+        typer.Option("--include-expired", help="Search global ISS securities for expired futures"),
+    ] = False,
     use_contract_date_ranges: Annotated[
         bool,
         typer.Option(
@@ -254,6 +317,7 @@ def futures_prepare_chain_data(
             board=board,
             metadata_path=metadata_path,
             use_contract_date_ranges=use_contract_date_ranges,
+            include_expired=include_expired,
             min_successful_contracts=min_successful_contracts,
             save_raw=save_raw,
             save_normalized=save_normalized,

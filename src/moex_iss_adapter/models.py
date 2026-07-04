@@ -168,6 +168,8 @@ class FuturesChainContract(AdapterBaseModel):
     assetcode: str | None = None
     last_trade_date: date | None = None
     expiration_date: date | None = None
+    metadata_found: bool = True
+    source_endpoint: str | None = None
 
 
 class FuturesContractDateRange(AdapterBaseModel):
@@ -185,6 +187,9 @@ class FuturesBulkSkip(AdapterBaseModel):
     secid: str | None = None
     board: str | None = None
     reason: str
+    metadata_found: bool | None = None
+    candles_found: bool | None = None
+    row_count: int | None = None
 
 
 class FuturesChainSelection(AdapterBaseModel):

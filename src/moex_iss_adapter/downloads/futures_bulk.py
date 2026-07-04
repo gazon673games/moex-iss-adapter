@@ -11,6 +11,7 @@ import polars as pl
 
 from moex_iss_adapter.client import MoexIssClient
 from moex_iss_adapter.constants import (
+    DEFAULT_FUTURES_BOARD,
     DEFAULT_FUTURES_ENGINE,
     DEFAULT_FUTURES_MARKET,
     DEFAULT_TIMEFRAME,
@@ -20,6 +21,10 @@ from moex_iss_adapter.downloads.candles import (
     download_candle_pages,
 )
 from moex_iss_adapter.downloads.futures import fetch_futures_securities_response
+from moex_iss_adapter.downloads.futures_history import (
+    fetch_futures_contract_details,
+    search_historical_futures_contracts,
+)
 from moex_iss_adapter.exceptions import MoexIssAdapterError
 from moex_iss_adapter.metadata import (
     current_snapshot_ts,
@@ -121,9 +126,9 @@ def _contract_from_row(row: Mapping[str, Any]) -> FuturesChainContract | Futures
     secid = _optional_str(row.get("secid"))
     board = _optional_str(row.get("board"))
     if not secid:
-        return FuturesBulkSkip(board=board, reason="missing_secid")
+        return FuturesBulkSkip(board=board, reason="missing_secid", metadata_found=False)
     if not board:
-        return FuturesBulkSkip(secid=secid, reason="missing_board")
+        return FuturesBulkSkip(secid=secid, reason="missing_board", metadata_found=True)
     return FuturesChainContract(
         secid=secid,
         board=board,
@@ -132,6 +137,8 @@ def _contract_from_row(row: Mapping[str, Any]) -> FuturesChainContract | Futures
         assetcode=_optional_str(row.get("assetcode")),
         last_trade_date=_optional_date(row.get("last_trade_date")),
         expiration_date=_optional_date(row.get("expiration_date")),
+        metadata_found=True,
+        source_endpoint="normalized_metadata_snapshot",
     )
 
 
@@ -165,6 +172,7 @@ def derive_contract_date_range(
             secid=contract.secid,
             board=contract.board,
             reason="expired_before_from_date",
+            metadata_found=contract.metadata_found,
         )
 
     till_date = metadata_end_date.isoformat() if metadata_end_date else user_till_date
@@ -222,6 +230,7 @@ def select_futures_chain_contracts(
                     secid=contract.secid,
                     board=contract.board,
                     reason="not_selected_by_limit",
+                    metadata_found=contract.metadata_found,
                 )
             )
         contracts = contracts[:limit]
@@ -331,6 +340,71 @@ def _fetch_metadata_snapshot(
     )
 
 
+def _contract_key(secid: str) -> str:
+    return secid.casefold()
+
+
+def _merge_contracts(
+    contracts: list[FuturesChainContract],
+    additions: Iterable[FuturesChainContract],
+) -> list[FuturesChainContract]:
+    result = list(contracts)
+    seen = {_contract_key(contract.secid) for contract in result}
+    for contract in additions:
+        key = _contract_key(contract.secid)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(contract)
+    result.sort(key=_contract_sort_key)
+    return result
+
+
+def _manual_include_contracts(
+    *,
+    include_secids: Iterable[str] | None,
+    selected_contracts: Iterable[FuturesChainContract],
+    exclude_secids: Iterable[str] | None,
+    board: str | None,
+    config: MoexIssConfig,
+    client: MoexIssClient,
+) -> list[FuturesChainContract]:
+    selected = {_contract_key(contract.secid) for contract in selected_contracts}
+    excluded = _casefold_set(exclude_secids)
+    additions: list[FuturesChainContract] = []
+    for raw_secid in include_secids or ():
+        secid = raw_secid.strip()
+        if not secid:
+            continue
+        key = _contract_key(secid)
+        if key in selected or key in excluded:
+            continue
+        try:
+            details = fetch_futures_contract_details(
+                secid=secid,
+                config=config,
+                client=client,
+            )
+        except MoexIssAdapterError:
+            details = None
+
+        if details is not None:
+            if board and details.board.casefold() != board.casefold():
+                continue
+            additions.append(details)
+            continue
+
+        additions.append(
+            FuturesChainContract(
+                secid=secid,
+                board=board or DEFAULT_FUTURES_BOARD,
+                metadata_found=False,
+                source_endpoint="manual_include",
+            )
+        )
+    return additions
+
+
 def _download_one_bulk_contract(
     *,
     client: MoexIssClient,
@@ -425,6 +499,7 @@ def prepare_futures_chain_data(
     board: str | None = None,
     metadata_path: Path | str | None = None,
     use_contract_date_ranges: bool = False,
+    include_expired: bool = False,
     min_successful_contracts: int = 1,
     save_raw: bool = False,
     save_normalized: bool = False,
@@ -463,8 +538,38 @@ def prepare_futures_chain_data(
         )
 
         skipped = list(selection.skipped)
+        selected_contracts = list(selection.contracts)
+
+        historical_query = query or asset_code or secid_prefix
+        if include_expired and historical_query:
+            historical_contracts = search_historical_futures_contracts(
+                query=historical_query,
+                secid_prefix=secid_prefix,
+                asset_code=asset_code,
+                exclude_secids=exclude_secids,
+                client=effective_client,
+                config=effective_config,
+            )
+            if board:
+                historical_contracts = [
+                    contract
+                    for contract in historical_contracts
+                    if contract.board.casefold() == board.casefold()
+                ]
+            selected_contracts = _merge_contracts(selected_contracts, historical_contracts)
+
+        manual_contracts = _manual_include_contracts(
+            include_secids=include_secids,
+            selected_contracts=selected_contracts,
+            exclude_secids=exclude_secids,
+            board=board,
+            config=effective_config,
+            client=effective_client,
+        )
+        selected_contracts = _merge_contracts(selected_contracts, manual_contracts)
+
         downloads = []
-        for contract in selection.contracts:
+        for contract in selected_contracts:
             date_range = derive_contract_date_range(
                 contract,
                 user_from_date=from_date,
@@ -492,6 +597,8 @@ def prepare_futures_chain_data(
                         secid=contract.secid,
                         board=contract.board,
                         reason=f"download_failed: {exc}",
+                        metadata_found=contract.metadata_found,
+                        candles_found=False,
                     )
                 )
                 continue
@@ -502,6 +609,9 @@ def prepare_futures_chain_data(
                         secid=contract.secid,
                         board=contract.board,
                         reason="no_rows",
+                        metadata_found=contract.metadata_found,
+                        candles_found=False,
+                        row_count=0,
                     )
                 )
                 continue
@@ -509,9 +619,9 @@ def prepare_futures_chain_data(
 
         return FuturesBulkResult(
             metadata_snapshot=metadata_snapshot,
-            contracts_found=selection.contracts_found,
+            contracts_found=max(selection.contracts_found, len(selected_contracts)),
             min_successful_contracts=min_successful_contracts,
-            selected_contracts=selection.contracts,
+            selected_contracts=selected_contracts,
             download_results=downloads,
             skipped_contracts=skipped,
         )

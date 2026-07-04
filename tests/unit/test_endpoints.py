@@ -8,6 +8,8 @@ from moex_iss_adapter.endpoints import (
     build_candles_path,
     build_candles_request,
     build_full_url,
+    build_global_securities_search_path,
+    build_global_security_details_path,
     build_market_candles_path,
     build_market_securities_path,
     build_securities_columns_path,
@@ -92,6 +94,11 @@ def test_builds_futures_market_level_candles_endpoint() -> None:
         build_market_candles_path("futures", "forts", "CNYRUBF")
         == "/engines/futures/markets/forts/securities/CNYRUBF/candles.json"
     )
+
+
+def test_builds_global_security_search_and_details_endpoints() -> None:
+    assert build_global_securities_search_path() == "/securities.json"
+    assert build_global_security_details_path("CRH5") == "/securities/CRH5.json"
 
 
 def test_builds_futures_board_specific_candles_request() -> None:

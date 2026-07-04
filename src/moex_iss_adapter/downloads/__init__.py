@@ -15,6 +15,14 @@ from moex_iss_adapter.downloads.futures import (
     search_futures_securities,
     search_saved_futures_metadata,
 )
+from moex_iss_adapter.downloads.futures_bulk import (
+    prepare_futures_chain_data,
+    select_futures_chain_contracts,
+)
+from moex_iss_adapter.downloads.futures_history import (
+    fetch_futures_contract_details,
+    search_historical_futures_contracts,
+)
 from moex_iss_adapter.downloads.futures_metadata import save_futures_metadata_snapshot
 
 __all__ = [
@@ -22,10 +30,14 @@ __all__ = [
     "download_currency_candles",
     "download_futures_candles",
     "fetch_currency_securities",
+    "fetch_futures_contract_details",
     "fetch_futures_securities",
     "fetch_futures_securities_response",
+    "prepare_futures_chain_data",
     "save_futures_metadata_snapshot",
     "search_currency_securities",
     "search_futures_securities",
+    "search_historical_futures_contracts",
     "search_saved_futures_metadata",
+    "select_futures_chain_contracts",
 ]

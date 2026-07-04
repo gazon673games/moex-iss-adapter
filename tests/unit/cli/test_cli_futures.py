@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from typer.testing import CliRunner
 
@@ -44,6 +44,59 @@ def test_cli_exposes_futures_search_subcommand(
     assert result.exit_code == 0
     assert "SECID | SHORTNAME | SECNAME | BOARDID | ASSETCODE | LASTTRADEDATE" in result.output
     assert "CNYRUBF" in result.output
+
+
+def test_cli_filters_current_futures_search_by_secid_prefix(
+    monkeypatch,
+    futures_securities_response: dict,
+) -> None:
+    monkeypatch.setattr(
+        "moex_iss_adapter.cli.futures.search_futures_securities",
+        lambda **_kwargs: parse_futures_securities(futures_securities_response),
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["futures", "search", "--query", "CNY", "--secid-prefix", "CR"])
+
+    assert result.exit_code == 0
+    assert "CRU6" in result.output
+    assert "MYU6" not in result.output
+    assert "UCU6" not in result.output
+    assert "CNYRUBF" not in result.output
+
+
+def test_cli_search_include_expired_uses_historical_discovery(monkeypatch) -> None:
+    def fake_search_historical_futures_contracts(**kwargs) -> list[FuturesChainContract]:
+        assert kwargs["query"] == "CNY"
+        assert kwargs["secid_prefix"] == "CR"
+        return [
+            FuturesChainContract(
+                secid="CRH5",
+                board="RFUD",
+                shortname="CNY-3.25",
+                secname="Futures contract CNY-3.25",
+                assetcode="CNY",
+                expiration_date=date(2025, 3, 20),
+                last_trade_date=date(2025, 3, 20),
+                source_endpoint="/securities/CRH5.json",
+            )
+        ]
+
+    monkeypatch.setattr(
+        "moex_iss_adapter.cli.futures.search_historical_futures_contracts",
+        fake_search_historical_futures_contracts,
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["futures", "search", "--query", "CNY", "--secid-prefix", "CR", "--include-expired"],
+    )
+
+    assert result.exit_code == 0
+    assert "EXPIRATION_DATE" in result.output
+    assert "CRH5 | RFUD | CNY-3.25" in result.output
+    assert "/securities/CRH5.json" in result.output
 
 
 def test_cli_searches_saved_futures_metadata_snapshot(
@@ -185,7 +238,16 @@ def test_cli_exposes_futures_prepare_chain_data_subcommand(monkeypatch, tmp_path
                 FuturesChainContract(secid="CRU6", board="RFUD"),
             ],
             download_results=[download],
-            skipped_contracts=[FuturesBulkSkip(secid="CRU6", board="RFUD", reason="no_rows")],
+            skipped_contracts=[
+                FuturesBulkSkip(
+                    secid="CRU6",
+                    board="RFUD",
+                    reason="no_rows",
+                    metadata_found=True,
+                    candles_found=False,
+                    row_count=0,
+                )
+            ],
         )
 
     monkeypatch.setattr(
@@ -218,6 +280,10 @@ def test_cli_exposes_futures_prepare_chain_data_subcommand(monkeypatch, tmp_path
     assert "contracts_downloaded: 1" in result.output
     assert "successful_contracts: 1" in result.output
     assert "rows_total: 1" in result.output
+    assert "metadata_found: True" in result.output
+    assert "candles_found: True" in result.output
+    assert "candles_found: False" in result.output
+    assert "row_count: 0" in result.output
     assert "from_date_used: 2023-01-10" in result.output
     assert "till_date_used: 2023-01-20" in result.output
     assert "CRU6@RFUD: no_rows" in result.output

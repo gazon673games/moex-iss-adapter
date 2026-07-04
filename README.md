@@ -72,6 +72,7 @@ Futures discovery and candles:
 
 ```bash
 uv run moex-iss futures search --query CNY
+uv run moex-iss futures search --query CNY --secid-prefix CR --include-expired
 uv run moex-iss futures candles \
   --symbol CNYRUBF \
   --timeframe 1d \
@@ -112,19 +113,32 @@ uv run moex-iss futures search \
 The CLI prints compact summaries: identifiers, requested range, row count,
 min/max timestamp, output paths, and quality status.
 
-## Preparing futures data for continuous futures research
+## Historical futures contracts for continuous futures research
 
-Use the adapter to prepare concrete CNY/RUB futures inputs for downstream
-research:
+The adapter downloads concrete futures contracts. It does not build continuous
+futures, choose roll dates, back-adjust prices, or run backtests.
+
+CNY/RUB research needs one clean contract family. A broad `--query CNY` can mix
+different MOEX families: `CR*`, `MY*`, `UC*`, and `CNYRUBF`. Use
+`--secid-prefix CR` for the CR family, or pass an explicit `--include-secid`
+list when you already know the historical SECIDs.
+
+MOEX ISS exposes expired candidates through the global securities search
+endpoint for bounded queries such as `q=CNY`, and `/securities/<SECID>.json`
+provides per-contract board and date metadata when available. There is still no
+single free ISS endpoint in this adapter that is treated as a complete official
+expired futures calendar, so manual SECID lists remain supported.
 
 ```bash
 uv run moex-iss futures prepare-chain-data \
   --query CNY \
+  --secid-prefix CR \
+  --include-expired \
   --timeframe 1d \
   --from-date 2015-01-01 \
   --till-date 2026-01-01 \
   --use-contract-date-ranges \
-  --min-successful-contracts 2 \
+  --min-successful-contracts 5 \
   --save-raw \
   --save-normalized \
   --overwrite
@@ -158,6 +172,32 @@ uv run moex-iss futures prepare-chain-data \
   --save-normalized \
   --overwrite
 ```
+
+Explicit SECID fallback:
+
+```bash
+uv run moex-iss futures prepare-chain-data \
+  --include-secid CRH5 \
+  --include-secid CRM5 \
+  --include-secid CRU5 \
+  --include-secid CRZ5 \
+  --include-secid CRH6 \
+  --include-secid CRM6 \
+  --include-secid CRU6 \
+  --include-secid CRZ6 \
+  --timeframe 1d \
+  --from-date 2015-01-01 \
+  --till-date 2026-01-01 \
+  --use-contract-date-ranges \
+  --save-raw \
+  --save-normalized \
+  --overwrite
+```
+
+If a manually included SECID is absent from the current futures metadata
+snapshot, the adapter still tries the futures candle endpoint using the explicit
+SECID and reports `metadata_found`, `candles_found`, `row_count`, and
+`skip_reason`.
 
 Validate the adapter output in `ohlcv-data-store`:
 
@@ -279,6 +319,8 @@ uv run pytest tests/integration -m integration
 - Candles only.
 - Primary timeframe: `1d`.
 - Futures support concrete expiring contracts only.
+- Expired futures discovery depends on what MOEX ISS global search and security
+  detail endpoints expose for the requested query.
 - Currency support concrete `currency/selt` instruments only.
 - No continuous futures stitching or roll rules.
 - No corporate action or dividend adjustment.

@@ -30,3 +30,37 @@
 - Currency candles use the same canonical OHLCV schema as shares and futures.
   Currency-specific metadata such as `FACEUNIT`, `CURRENCYID`, `LOTSIZE`, and
   `SETTLEDATE` remains in discovery metadata or raw responses.
+
+## Historical Futures Endpoint Findings
+
+Checked on 2026-07-04 against official MOEX ISS endpoints:
+
+- `/engines/futures/markets/forts/securities.json` returns current and future
+  FORTS securities. It is useful for current metadata snapshots, but it is not a
+  long expired contract calendar.
+- `/history/engines/futures/markets/forts/securities.json` and
+  `/history/engines/futures/markets/forts/boards/RFUD/securities.json` return
+  historical daily trading rows for a date. They do not provide a compact
+  metadata list of expired contracts with full lifecycle fields.
+- `/securities.json?q=CNY` returns global security search rows and can expose
+  expired FORTS futures candidates when paginated and filtered by
+  `group=futures_forts`, `type=futures`, and a family prefix such as `CR`.
+- `/securities/<SECID>.json` returns details for current or expired SECIDs when
+  MOEX ISS knows the symbol. For `CRH5`, the response included FORTS board
+  metadata and lifecycle fields such as first trade, last trade, last delivery,
+  and asset code.
+- `/engines/futures/markets/forts/boards/RFUD/securities/<SECID>/candles.json`
+  can return historical candles for an expired contract such as `CRH5` over a
+  bounded date range.
+
+Practical conclusion: the adapter uses global ISS search plus security details
+as adapter-level discovery for expired FORTS futures. This is sufficient to
+find a longer CR CNY/RUB family when MOEX returns those rows, but it is not
+documented here as a guaranteed complete free expired futures calendar. The
+CLI also supports explicit `--include-secid` fallback, so known historical
+SECIDs can be downloaded even when they are absent from the current metadata
+snapshot.
+
+Use `scripts/probe_futures_history.py` for a bounded live probe report. The
+script prints endpoint, status, row count, columns, sample SECIDs, and notes
+without downloading large datasets.

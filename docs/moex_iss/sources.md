@@ -28,6 +28,14 @@ Updated: 2026-07-04
   https://iss.moex.com/iss/engines/futures/markets/forts/securities/CNYRUBF/candles.json?from=2023-01-10&till=2023-01-20&interval=24&start=0
 - Futures board-specific candles:
   https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/CNYRUBF/candles.json?from=2023-01-10&till=2023-01-20&interval=24&start=0
+- Global securities search for historical futures candidates:
+  https://iss.moex.com/iss/securities.json?q=CNY&iss.only=securities
+- Security details for an expired futures SECID:
+  https://iss.moex.com/iss/securities/CRH5.json
+- Historical FORTS market rows:
+  https://iss.moex.com/iss/history/engines/futures/markets/forts/securities.json?date=2025-03-07
+- Historical board-specific rows for one futures SECID:
+  https://iss.moex.com/iss/history/engines/futures/markets/forts/boards/RFUD/securities/CRH5.json?from=2025-01-01&till=2025-03-31
 - Currency securities:
   https://iss.moex.com/iss/engines/currency/markets/selt/securities.json
 - Currency securities columns:

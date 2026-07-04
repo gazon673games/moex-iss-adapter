@@ -12,6 +12,8 @@ from moex_iss_adapter.endpoints import (
     build_boards_path,
     build_candles_request,
     build_engines_path,
+    build_global_securities_search_path,
+    build_global_security_details_path,
     build_market_securities_path,
     build_markets_path,
     build_securities_columns_path,
@@ -111,6 +113,19 @@ class MoexIssClient:
 
     def get_securities(self, engine: str, market: str, board: str) -> dict[str, Any]:
         return self.get_json(build_securities_path(engine, market, board))
+
+    def search_global_securities(self, query: str, start: int = 0) -> dict[str, Any]:
+        return self.get_json(
+            build_global_securities_search_path(),
+            params={
+                "iss.only": "securities",
+                "q": query,
+                "start": start,
+            },
+        )
+
+    def get_security_details(self, security: str) -> dict[str, Any]:
+        return self.get_json(build_global_security_details_path(security))
 
     def get_candles_page(
         self,
