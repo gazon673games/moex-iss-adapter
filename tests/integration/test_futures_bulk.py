@@ -17,6 +17,8 @@ def test_prepare_live_cny_futures_chain_data(tmp_path) -> None:
             from_date="2026-07-01",
             till_date="2026-07-03",
             limit=3,
+            use_contract_date_ranges=True,
+            min_successful_contracts=1,
             save_raw=True,
             save_normalized=True,
             data_root=tmp_path,

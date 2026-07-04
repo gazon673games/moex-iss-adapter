@@ -123,16 +123,21 @@ uv run moex-iss futures prepare-chain-data \
   --timeframe 1d \
   --from-date 2015-01-01 \
   --till-date 2026-01-01 \
+  --use-contract-date-ranges \
+  --min-successful-contracts 2 \
   --save-raw \
   --save-normalized \
   --overwrite
 ```
 
 The command creates a futures metadata snapshot, discovers matching concrete
-contracts from metadata, downloads daily candles per SECID, saves raw JSON and
-canonical OHLCV Parquet, runs per-contract quality checks, and prints a compact
-summary of downloaded and skipped contracts. It does not stitch contracts, roll
-contracts, back-adjust prices, or build a continuous futures series.
+contracts from metadata, derives per-contract request end dates from
+expiration/last-trade metadata when `--use-contract-date-ranges` is supplied,
+downloads daily candles per SECID, saves raw JSON and canonical OHLCV Parquet,
+runs per-contract quality checks, and prints a compact summary of downloaded
+and skipped contracts. Empty no-row candle responses are reported and do not
+produce normalized candle Parquet. It does not stitch contracts, roll contracts,
+back-adjust prices, or build a continuous futures series.
 
 Optional filters:
 
@@ -147,6 +152,8 @@ uv run moex-iss futures prepare-chain-data \
   --board RFUD \
   --from-date 2023-01-01 \
   --till-date 2023-03-31 \
+  --use-contract-date-ranges \
+  --min-successful-contracts 2 \
   --save-raw \
   --save-normalized \
   --overwrite
@@ -164,7 +171,13 @@ Then inspect and build the continuous chain in `continuous-futures-builder`:
 ```bash
 cd ../continuous-futures-builder
 uv run continuous-futures snapshots --data-root ../moex_iss_adapter/data
-uv run continuous-futures chain --data-root ../moex_iss_adapter/data --exchange MOEX --engine futures --market forts --metadata-snapshot-ts <SNAPSHOT_TS> --query CNY
+uv run continuous-futures chain \
+  --data-root ../moex_iss_adapter/data \
+  --exchange MOEX \
+  --engine futures \
+  --market forts \
+  --metadata-snapshot-ts <SNAPSHOT_TS> \
+  --query CNY
 ```
 
 Continuous futures construction belongs to `continuous-futures-builder`, not to

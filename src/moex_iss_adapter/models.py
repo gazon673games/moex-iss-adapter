@@ -170,6 +170,15 @@ class FuturesChainContract(AdapterBaseModel):
     expiration_date: date | None = None
 
 
+class FuturesContractDateRange(AdapterBaseModel):
+    """Concrete request date range derived for one futures contract."""
+
+    secid: str
+    board: str
+    from_date: str
+    till_date: str
+
+
 class FuturesBulkSkip(AdapterBaseModel):
     """One futures contract or candidate skipped during bulk preparation."""
 
@@ -191,6 +200,7 @@ class FuturesBulkResult(AdapterBaseModel):
 
     metadata_snapshot: MetadataSnapshotResult
     contracts_found: int
+    min_successful_contracts: int = 1
     selected_contracts: list[FuturesChainContract] = Field(default_factory=list)
     download_results: list[DownloadResult] = Field(default_factory=list)
     skipped_contracts: list[FuturesBulkSkip] = Field(default_factory=list)
@@ -214,6 +224,18 @@ class FuturesBulkResult(AdapterBaseModel):
     @property
     def rows_total(self) -> int:
         return sum(result.row_count for result in self.download_results)
+
+    @property
+    def successful_contracts(self) -> int:
+        return sum(1 for result in self.download_results if result.quality_report.passed)
+
+    @property
+    def failed_contracts(self) -> int:
+        return max(0, self.contracts_selected - self.successful_contracts)
+
+    @property
+    def meets_min_successful_contracts(self) -> bool:
+        return self.successful_contracts >= self.min_successful_contracts
 
     @property
     def normalized_paths(self) -> list[Path]:

@@ -40,17 +40,25 @@ def _print_prepare_chain_data_result(result: FuturesBulkResult) -> None:
     typer.echo(f"contracts_selected: {summary['contracts_selected']}")
     typer.echo(f"contracts_downloaded: {summary['contracts_downloaded']}")
     typer.echo(f"contracts_skipped: {summary['contracts_skipped']}")
+    typer.echo(f"successful_contracts: {summary['successful_contracts']}")
+    typer.echo(f"failed_contracts: {summary['failed_contracts']}")
     typer.echo(f"rows_total: {summary['rows_total']}")
 
-    typer.echo("normalized_paths:")
-    normalized_paths = result.normalized_paths
-    if normalized_paths:
-        for path in normalized_paths:
-            typer.echo(f"- {path}")
+    typer.echo("downloaded_contracts:")
+    if result.download_results:
+        for download in result.download_results:
+            typer.echo(f"- secid: {download.symbol}")
+            typer.echo(f"  board: {download.board}")
+            typer.echo(f"  from_date_used: {download.from_date}")
+            typer.echo(f"  till_date_used: {download.till_date}")
+            typer.echo(f"  row_count: {download.row_count}")
+            typer.echo(f"  min_ts: {download.min_ts}")
+            typer.echo(f"  max_ts: {download.max_ts}")
+            typer.echo(f"  normalized_path: {download.normalized_path}")
     else:
         typer.echo("- none")
 
-    typer.echo("skipped_reasons:")
+    typer.echo("skipped_contracts:")
     if result.skipped_contracts:
         for skipped in result.skipped_contracts:
             label = skipped.secid or "<unknown>"
@@ -208,6 +216,21 @@ def futures_prepare_chain_data(
         Path | None,
         typer.Option("--metadata-path", help="Reuse a saved normalized metadata Parquet snapshot"),
     ] = None,
+    use_contract_date_ranges: Annotated[
+        bool,
+        typer.Option(
+            "--use-contract-date-ranges",
+            help="Use expiration/last-trade metadata to derive per-contract request ranges",
+        ),
+    ] = False,
+    min_successful_contracts: Annotated[
+        int,
+        typer.Option(
+            "--min-successful-contracts",
+            min=1,
+            help="Minimum quality-passing downloaded contracts required for exit code 0",
+        ),
+    ] = 1,
     save_raw: Annotated[bool, typer.Option("--save-raw")] = False,
     save_normalized: Annotated[bool, typer.Option("--save-normalized")] = False,
     data_root: Annotated[Path, typer.Option("--data-root")] = Path("data"),
@@ -230,6 +253,8 @@ def futures_prepare_chain_data(
             limit=limit,
             board=board,
             metadata_path=metadata_path,
+            use_contract_date_ranges=use_contract_date_ranges,
+            min_successful_contracts=min_successful_contracts,
             save_raw=save_raw,
             save_normalized=save_normalized,
             data_root=data_root,
@@ -240,7 +265,19 @@ def futures_prepare_chain_data(
         raise typer.Exit(code=1) from exc
 
     _print_prepare_chain_data_result(result)
-    if result.contracts_downloaded == 0:
+    if not result.meets_min_successful_contracts:
+        downstream_note = (
+            " Downstream continuous futures research needs at least 2 concrete contracts "
+            "with candle data."
+            if result.min_successful_contracts >= 2
+            else ""
+        )
+        typer.echo(
+            "Error: successful downloaded contracts "
+            f"({result.successful_contracts}) is below --min-successful-contracts "
+            f"({result.min_successful_contracts}).{downstream_note}",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
 

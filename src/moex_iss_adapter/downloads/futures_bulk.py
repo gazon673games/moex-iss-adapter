@@ -15,10 +15,11 @@ from moex_iss_adapter.constants import (
     DEFAULT_FUTURES_MARKET,
     DEFAULT_TIMEFRAME,
 )
-from moex_iss_adapter.downloads.futures import (
-    download_futures_candles,
-    fetch_futures_securities_response,
+from moex_iss_adapter.downloads.candles import (
+    CandleDownloadRequest,
+    download_candle_pages,
 )
+from moex_iss_adapter.downloads.futures import fetch_futures_securities_response
 from moex_iss_adapter.exceptions import MoexIssAdapterError
 from moex_iss_adapter.metadata import (
     current_snapshot_ts,
@@ -27,15 +28,23 @@ from moex_iss_adapter.metadata import (
     normalize_futures_metadata,
 )
 from moex_iss_adapter.models import (
+    DownloadResult,
     FuturesBulkResult,
     FuturesBulkSkip,
     FuturesChainContract,
     FuturesChainSelection,
+    FuturesContractDateRange,
     MetadataSnapshotResult,
     MoexIssConfig,
 )
-from moex_iss_adapter.quality import validate_futures_metadata
-from moex_iss_adapter.storage import save_normalized_futures_metadata, save_raw_futures_metadata
+from moex_iss_adapter.normalizers import normalize_candles
+from moex_iss_adapter.quality import validate_candles, validate_futures_metadata
+from moex_iss_adapter.storage import (
+    save_normalized_candles,
+    save_normalized_futures_metadata,
+    save_raw_candles,
+    save_raw_futures_metadata,
+)
 from moex_iss_adapter.storage.paths import partition_value
 
 FUTURES_BULK_QUERY_FIELDS = ("secid", "shortname", "secname", "assetcode")
@@ -72,6 +81,14 @@ def _casefold_set(values: Iterable[str] | None) -> set[str]:
     return {value.casefold() for value in values or () if value.strip()}
 
 
+def _parse_user_date(value: str, option_name: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        msg = f"{option_name} must be an ISO date in YYYY-MM-DD format"
+        raise MoexIssAdapterError(msg) from exc
+
+
 def _matches_filters(
     row: Mapping[str, Any],
     *,
@@ -104,9 +121,9 @@ def _contract_from_row(row: Mapping[str, Any]) -> FuturesChainContract | Futures
     secid = _optional_str(row.get("secid"))
     board = _optional_str(row.get("board"))
     if not secid:
-        return FuturesBulkSkip(board=board, reason="missing secid")
+        return FuturesBulkSkip(board=board, reason="missing_secid")
     if not board:
-        return FuturesBulkSkip(secid=secid, reason="missing board")
+        return FuturesBulkSkip(secid=secid, reason="missing_board")
     return FuturesChainContract(
         secid=secid,
         board=board,
@@ -121,6 +138,42 @@ def _contract_from_row(row: Mapping[str, Any]) -> FuturesChainContract | Futures
 def _contract_sort_key(contract: FuturesChainContract) -> tuple[bool, date, str]:
     sort_date = contract.expiration_date or contract.last_trade_date
     return sort_date is None, sort_date or date.max, contract.secid
+
+
+def derive_contract_date_range(
+    contract: FuturesChainContract,
+    *,
+    user_from_date: str,
+    user_till_date: str,
+    use_contract_date_ranges: bool,
+) -> FuturesContractDateRange | FuturesBulkSkip:
+    """Derive the MOEX candle request range for one selected futures contract."""
+
+    from_date = _parse_user_date(user_from_date, "--from-date")
+    _parse_user_date(user_till_date, "--till-date")
+    if not use_contract_date_ranges:
+        return FuturesContractDateRange(
+            secid=contract.secid,
+            board=contract.board,
+            from_date=user_from_date,
+            till_date=user_till_date,
+        )
+
+    metadata_end_date = contract.expiration_date or contract.last_trade_date
+    if metadata_end_date is not None and metadata_end_date < from_date:
+        return FuturesBulkSkip(
+            secid=contract.secid,
+            board=contract.board,
+            reason="expired_before_from_date",
+        )
+
+    till_date = metadata_end_date.isoformat() if metadata_end_date else user_till_date
+    return FuturesContractDateRange(
+        secid=contract.secid,
+        board=contract.board,
+        from_date=user_from_date,
+        till_date=till_date,
+    )
 
 
 def select_futures_chain_contracts(
@@ -168,7 +221,7 @@ def select_futures_chain_contracts(
                 FuturesBulkSkip(
                     secid=contract.secid,
                     board=contract.board,
-                    reason="not selected by limit",
+                    reason="not_selected_by_limit",
                 )
             )
         contracts = contracts[:limit]
@@ -278,6 +331,86 @@ def _fetch_metadata_snapshot(
     )
 
 
+def _download_one_bulk_contract(
+    *,
+    client: MoexIssClient,
+    config: MoexIssConfig,
+    date_range: FuturesContractDateRange,
+    timeframe: str,
+    save_raw: bool,
+    save_normalized: bool,
+    data_root: Path | str,
+    overwrite: bool,
+) -> DownloadResult:
+    request = CandleDownloadRequest(
+        symbol=date_range.secid,
+        engine=DEFAULT_FUTURES_ENGINE,
+        market=DEFAULT_FUTURES_MARKET,
+        board=date_range.board,
+        request_board=date_range.board,
+        timeframe=timeframe,
+        from_date=date_range.from_date,
+        till_date=date_range.till_date,
+        save_raw=save_raw,
+        save_normalized=False,
+        data_root=data_root,
+        overwrite=overwrite,
+    )
+    raw_pages = download_candle_pages(client=client, config=config, request=request)
+    normalized = normalize_candles(
+        raw_pages,
+        engine=request.engine,
+        market=request.market,
+        board=request.board,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+    )
+    quality_report = validate_candles(normalized)
+
+    raw_path = None
+    normalized_path = None
+    if save_raw:
+        raw_path = save_raw_candles(
+            responses=raw_pages,
+            data_root=data_root,
+            engine=request.engine,
+            market=request.market,
+            board=request.board,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            from_date=request.from_date,
+            till_date=request.till_date,
+            overwrite=overwrite,
+        )
+    if save_normalized and quality_report.row_count > 0:
+        normalized_path = save_normalized_candles(
+            frame=normalized,
+            data_root=data_root,
+            engine=request.engine,
+            market=request.market,
+            board=request.board,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            overwrite=overwrite,
+        )
+
+    return DownloadResult(
+        symbol=request.symbol,
+        engine=request.engine,
+        market=request.market,
+        board=request.board,
+        timeframe=request.timeframe,
+        from_date=request.from_date,
+        till_date=request.till_date,
+        row_count=quality_report.row_count,
+        min_ts=quality_report.min_ts,
+        max_ts=quality_report.max_ts,
+        raw_path=raw_path,
+        normalized_path=normalized_path,
+        quality_report=quality_report,
+    )
+
+
 def prepare_futures_chain_data(
     *,
     from_date: str,
@@ -291,6 +424,8 @@ def prepare_futures_chain_data(
     limit: int | None = None,
     board: str | None = None,
     metadata_path: Path | str | None = None,
+    use_contract_date_ranges: bool = False,
+    min_successful_contracts: int = 1,
     save_raw: bool = False,
     save_normalized: bool = False,
     data_root: Path | str = "data",
@@ -330,26 +465,33 @@ def prepare_futures_chain_data(
         skipped = list(selection.skipped)
         downloads = []
         for contract in selection.contracts:
+            date_range = derive_contract_date_range(
+                contract,
+                user_from_date=from_date,
+                user_till_date=till_date,
+                use_contract_date_ranges=use_contract_date_ranges,
+            )
+            if isinstance(date_range, FuturesBulkSkip):
+                skipped.append(date_range)
+                continue
+
             try:
-                result = download_futures_candles(
-                    symbol=contract.secid,
-                    board=contract.board,
+                result = _download_one_bulk_contract(
+                    client=effective_client,
+                    config=effective_config,
+                    date_range=date_range,
                     timeframe=timeframe,
-                    from_date=from_date,
-                    till_date=till_date,
                     save_raw=save_raw,
                     save_normalized=save_normalized,
                     data_root=data_root,
                     overwrite=overwrite,
-                    config=effective_config,
-                    client=effective_client,
                 )
             except MoexIssAdapterError as exc:
                 skipped.append(
                     FuturesBulkSkip(
                         secid=contract.secid,
                         board=contract.board,
-                        reason=f"download failed: {exc}",
+                        reason=f"download_failed: {exc}",
                     )
                 )
                 continue
@@ -359,7 +501,7 @@ def prepare_futures_chain_data(
                     FuturesBulkSkip(
                         secid=contract.secid,
                         board=contract.board,
-                        reason="no candle rows",
+                        reason="no_rows",
                     )
                 )
                 continue
@@ -368,6 +510,7 @@ def prepare_futures_chain_data(
         return FuturesBulkResult(
             metadata_snapshot=metadata_snapshot,
             contracts_found=selection.contracts_found,
+            min_successful_contracts=min_successful_contracts,
             selected_contracts=selection.contracts,
             download_results=downloads,
             skipped_contracts=skipped,
@@ -386,7 +529,9 @@ def format_futures_bulk_summary(result: FuturesBulkResult) -> dict[str, object]:
         "contracts_selected": result.contracts_selected,
         "contracts_downloaded": result.contracts_downloaded,
         "contracts_skipped": result.contracts_skipped,
+        "successful_contracts": result.successful_contracts,
+        "failed_contracts": result.failed_contracts,
         "rows_total": result.rows_total,
-        "normalized_paths": result.normalized_paths,
-        "skipped_reasons": result.skipped_contracts,
+        "downloaded_contracts": result.download_results,
+        "skipped_contracts": result.skipped_contracts,
     }
