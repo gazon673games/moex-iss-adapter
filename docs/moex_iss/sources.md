@@ -28,6 +28,16 @@ Updated: 2026-07-04
   https://iss.moex.com/iss/engines/futures/markets/forts/securities/CNYRUBF/candles.json?from=2023-01-10&till=2023-01-20&interval=24&start=0
 - Futures board-specific candles:
   https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/CNYRUBF/candles.json?from=2023-01-10&till=2023-01-20&interval=24&start=0
+- Currency securities:
+  https://iss.moex.com/iss/engines/currency/markets/selt/securities.json
+- Currency securities columns:
+  https://iss.moex.com/iss/engines/currency/markets/selt/securities/columns.json
+- Currency boards:
+  https://iss.moex.com/iss/engines/currency/markets/selt/boards.json
+- Currency market-level candles:
+  https://iss.moex.com/iss/engines/currency/markets/selt/securities/CNY000000TOD/candles.json?from=2023-01-10&till=2023-01-20&interval=24&start=0
+- Currency board-specific candles:
+  https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/CNY000000TOD/candles.json?from=2023-01-10&till=2023-01-20&interval=24&start=0
 
 ## Interval Notes
 
@@ -57,3 +67,10 @@ futures contract symbols under `engine=futures` and `market=forts`. Futures
 contracts expire, so active SECIDs change over time. The adapter does not build
 continuous futures, back-adjusted series, roll rules, margin models, settlement
 models, or futures analytics.
+
+## Currency Notes
+
+Currency support is limited to discovery and candle download for concrete MOEX
+currency SECIDs under `engine=currency` and `market=selt`. Users should discover
+the concrete instrument first because SECIDs such as CNY/RUB and USD/RUB may not
+match intuitive names.

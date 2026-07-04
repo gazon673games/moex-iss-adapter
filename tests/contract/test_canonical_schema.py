@@ -62,3 +62,20 @@ def test_futures_metadata_has_stable_schema(futures_securities_response: dict) -
 
     assert frame.columns == list(FUTURES_METADATA_COLUMNS)
     assert set(frame.columns).isdisjoint({"open", "high", "low", "close", "volume", "value"})
+
+
+def test_currency_candles_keep_canonical_schema(currency_candles_response: dict) -> None:
+    frame = normalize_candles(
+        [currency_candles_response],
+        engine="currency",
+        market="selt",
+        board="CETS",
+        symbol="CNY000000TOD",
+        timeframe="1d",
+    )
+
+    assert frame.columns == list(CANONICAL_OHLCV_COLUMNS)
+    assert frame.height == frame.unique(subset=list(UNIQUE_KEY_COLUMNS)).height
+    assert "ts" in frame.columns
+    for forbidden_column in FORBIDDEN_NORMALIZED_TIMESTAMP_COLUMNS:
+        assert forbidden_column not in frame.columns

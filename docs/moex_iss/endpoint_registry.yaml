@@ -82,3 +82,41 @@ endpoints:
       till: "YYYY-MM-DD"
       interval: "MOEX candle interval"
       start: "pagination offset"
+
+  currency_securities:
+    description: "List available MOEX currency securities for SELT."
+    path: "/engines/currency/markets/selt/securities.json"
+    default_mvp:
+      engine: "currency"
+      market: "selt"
+
+  currency_securities_columns:
+    description: "List MOEX currency securities column metadata."
+    path: "/engines/currency/markets/selt/securities/columns.json"
+
+  currency_boards:
+    description: "List MOEX currency boards for SELT."
+    path: "/engines/currency/markets/selt/boards.json"
+
+  currency_board_candles:
+    description: "Get candle data for a concrete currency instrument on a board."
+    path: "/engines/currency/markets/selt/boards/{board}/securities/{security}/candles.json"
+    required_path_params:
+      - board
+      - security
+    query_params:
+      from: "YYYY-MM-DD"
+      till: "YYYY-MM-DD"
+      interval: "MOEX candle interval"
+      start: "pagination offset"
+
+  currency_market_candles:
+    description: "Get candle data for a concrete currency instrument at market level."
+    path: "/engines/currency/markets/selt/securities/{security}/candles.json"
+    required_path_params:
+      - security
+    query_params:
+      from: "YYYY-MM-DD"
+      till: "YYYY-MM-DD"
+      interval: "MOEX candle interval"
+      start: "pagination offset"

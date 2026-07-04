@@ -8,11 +8,18 @@ from pathlib import Path
 from moex_iss_adapter.client import MoexIssClient
 from moex_iss_adapter.constants import (
     DEFAULT_BOARD,
+    DEFAULT_CURRENCY_ENGINE,
+    DEFAULT_CURRENCY_MARKET,
     DEFAULT_ENGINE,
     DEFAULT_FUTURES_ENGINE,
     DEFAULT_FUTURES_MARKET,
     DEFAULT_MARKET,
     DEFAULT_TIMEFRAME,
+)
+from moex_iss_adapter.currency import (
+    find_currency_by_secid,
+    parse_currency_securities,
+    search_currency,
 )
 from moex_iss_adapter.exceptions import MoexIssAdapterError, MoexPaginationError
 from moex_iss_adapter.futures import (
@@ -27,6 +34,7 @@ from moex_iss_adapter.metadata import (
     search_futures_metadata,
 )
 from moex_iss_adapter.models import (
+    CurrencySecurity,
     DownloadResult,
     FuturesSecurity,
     MetadataSnapshotResult,
@@ -319,6 +327,58 @@ def search_saved_futures_metadata(
     ]
 
 
+def fetch_currency_securities(
+    *,
+    engine: str = DEFAULT_CURRENCY_ENGINE,
+    market: str = DEFAULT_CURRENCY_MARKET,
+    config: MoexIssConfig | None = None,
+    client: MoexIssClient | None = None,
+) -> list[CurrencySecurity]:
+    """Fetch and parse available MOEX currency securities metadata."""
+
+    effective_config = config or MoexIssConfig()
+    owns_client = client is None
+    effective_client = client or MoexIssClient(effective_config)
+    try:
+        response = effective_client.get_market_securities(engine, market)
+    finally:
+        if owns_client:
+            effective_client.close()
+    return parse_currency_securities(response)
+
+
+def search_currency_securities(
+    *,
+    query: str | None = None,
+    secid: str | None = None,
+    short_name: str | None = None,
+    security_name: str | None = None,
+    face_unit: str | None = None,
+    currency_id: str | None = None,
+    engine: str = DEFAULT_CURRENCY_ENGINE,
+    market: str = DEFAULT_CURRENCY_MARKET,
+    config: MoexIssConfig | None = None,
+    client: MoexIssClient | None = None,
+) -> list[CurrencySecurity]:
+    """Fetch currency securities and filter them with adapter-side search."""
+
+    securities = fetch_currency_securities(
+        engine=engine,
+        market=market,
+        config=config,
+        client=client,
+    )
+    return search_currency(
+        securities,
+        query=query,
+        secid=secid,
+        short_name=short_name,
+        security_name=security_name,
+        face_unit=face_unit,
+        currency_id=currency_id,
+    )
+
+
 def save_futures_metadata_snapshot(
     *,
     save_raw: bool = False,
@@ -400,6 +460,33 @@ def _discover_futures_board(
     msg = (
         f"Could not discover board for futures contract {symbol!r}. "
         "Run `moex-iss futures search --query <text>` and pass the discovered BOARDID "
+        "with `--board`."
+    )
+    raise MoexIssAdapterError(msg)
+
+
+def _discover_currency_board(
+    *,
+    symbol: str,
+    engine: str,
+    market: str,
+    config: MoexIssConfig,
+    client: MoexIssClient,
+) -> str:
+    # Для currency/selt доску берем из текущих ISS-метаданных инструмента,
+    # чтобы не зашивать CETS как постоянное предположение.
+    securities = fetch_currency_securities(
+        engine=engine,
+        market=market,
+        config=config,
+        client=client,
+    )
+    security = find_currency_by_secid(securities, symbol)
+    if security and security.boardid:
+        return security.boardid
+    msg = (
+        f"Could not discover board for currency instrument {symbol!r}. "
+        "Run `moex-iss currency search --query <text>` and pass the discovered BOARDID "
         "with `--board`."
     )
     raise MoexIssAdapterError(msg)
@@ -490,6 +577,104 @@ def download_futures_candles(
         symbol=symbol,
         engine=DEFAULT_FUTURES_ENGINE,
         market=DEFAULT_FUTURES_MARKET,
+        board=resolved_board,
+        timeframe=timeframe,
+        from_date=from_date,
+        till_date=till_date,
+        row_count=quality_report.row_count,
+        min_ts=quality_report.min_ts,
+        max_ts=quality_report.max_ts,
+        raw_path=raw_path,
+        normalized_path=normalized_path,
+        quality_report=quality_report,
+    )
+
+
+def download_currency_candles(
+    *,
+    symbol: str,
+    from_date: str,
+    till_date: str,
+    board: str | None = None,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    save_raw: bool = False,
+    save_normalized: bool = False,
+    data_root: Path | str = "data",
+    overwrite: bool = False,
+    config: MoexIssConfig | None = None,
+    client: MoexIssClient | None = None,
+) -> DownloadResult:
+    """Download candles for one concrete MOEX currency instrument."""
+
+    effective_config = config or MoexIssConfig()
+    owns_client = client is None
+    effective_client = client or MoexIssClient(effective_config)
+    try:
+        resolved_board = board or _discover_currency_board(
+            symbol=symbol,
+            engine=DEFAULT_CURRENCY_ENGINE,
+            market=DEFAULT_CURRENCY_MARKET,
+            config=effective_config,
+            client=effective_client,
+        )
+        request_board = board
+        raw_pages = _download_candle_pages(
+            client=effective_client,
+            config=effective_config,
+            symbol=symbol,
+            engine=DEFAULT_CURRENCY_ENGINE,
+            market=DEFAULT_CURRENCY_MARKET,
+            board=resolved_board,
+            request_board=request_board,
+            timeframe=timeframe,
+            from_date=from_date,
+            till_date=till_date,
+        )
+    finally:
+        if owns_client:
+            effective_client.close()
+
+    normalized = normalize_candles(
+        raw_pages,
+        engine=DEFAULT_CURRENCY_ENGINE,
+        market=DEFAULT_CURRENCY_MARKET,
+        board=resolved_board,
+        symbol=symbol,
+        timeframe=timeframe,
+    )
+    quality_report = validate_candles(normalized)
+
+    raw_path = None
+    normalized_path = None
+    if save_raw:
+        raw_path = save_raw_candles(
+            responses=raw_pages,
+            data_root=data_root,
+            engine=DEFAULT_CURRENCY_ENGINE,
+            market=DEFAULT_CURRENCY_MARKET,
+            board=resolved_board,
+            symbol=symbol,
+            timeframe=timeframe,
+            from_date=from_date,
+            till_date=till_date,
+            overwrite=overwrite,
+        )
+    if save_normalized:
+        normalized_path = save_normalized_candles(
+            frame=normalized,
+            data_root=data_root,
+            engine=DEFAULT_CURRENCY_ENGINE,
+            market=DEFAULT_CURRENCY_MARKET,
+            board=resolved_board,
+            symbol=symbol,
+            timeframe=timeframe,
+            overwrite=overwrite,
+        )
+
+    return DownloadResult(
+        symbol=symbol,
+        engine=DEFAULT_CURRENCY_ENGINE,
+        market=DEFAULT_CURRENCY_MARKET,
         board=resolved_board,
         timeframe=timeframe,
         from_date=from_date,

@@ -16,9 +16,16 @@ if str(SRC) not in sys.path:
 
 from moex_iss_adapter.constants import (  # noqa: E402
     DEFAULT_BASE_URL,
+    DEFAULT_CURRENCY_ENGINE,
+    DEFAULT_CURRENCY_MARKET,
     DEFAULT_FUTURES_ENGINE,
     DEFAULT_FUTURES_MARKET,
     DEFAULT_TIMEFRAME,
+)
+from moex_iss_adapter.currency import (  # noqa: E402
+    CurrencySecurity,
+    is_cny_or_usd_related_currency,
+    parse_currency_securities,
 )
 from moex_iss_adapter.endpoints import (  # noqa: E402
     build_boards_path,
@@ -100,6 +107,31 @@ def _sample_futures_securities(payload: dict[str, Any], limit: int = 12) -> dict
     return _sample_table(payload, "securities", selected_rows)
 
 
+def _sample_currency_securities(payload: dict[str, Any], limit: int = 12) -> dict[str, Any]:
+    table = payload["securities"]
+    columns = table["columns"]
+    rows = table["data"]
+    cny_rows = [
+        row
+        for row in rows
+        if any(
+            "cny" in str(_row_dict(columns, row).get(field, "")).casefold()
+            for field in ("secid", "shortname", "secname", "faceunit", "currencyid", "latname")
+        )
+    ]
+    usd_rows = [
+        row
+        for row in rows
+        if any(
+            "usd" in str(_row_dict(columns, row).get(field, "")).casefold()
+            for field in ("secid", "shortname", "secname", "faceunit", "currencyid", "latname")
+        )
+    ]
+    preferred_rows = [*cny_rows[: limit // 2], *usd_rows[: limit - (limit // 2)]]
+    selected_rows = preferred_rows[:limit] if preferred_rows else rows[:limit]
+    return _sample_table(payload, "securities", selected_rows)
+
+
 def _choose_futures_candidate(
     securities: list[FuturesSecurity],
 ) -> tuple[FuturesSecurity | None, str]:
@@ -118,6 +150,31 @@ def _choose_futures_candidate(
             "no CNY/RUB-related futures found; selected fallback liquid futures contract",
         )
     return None, "no futures securities returned"
+
+
+def _choose_currency_candidate(
+    securities: list[CurrencySecurity],
+) -> tuple[CurrencySecurity | None, str]:
+    candidates = [security for security in securities if is_cny_or_usd_related_currency(security)]
+    cny_preferred = next(
+        (security for security in candidates if security.secid == "CNY000000TOD"),
+        None,
+    )
+    if cny_preferred:
+        return cny_preferred, "selected CNY/RUB-related CNY000000TOD instrument"
+    usd_preferred = next(
+        (security for security in candidates if security.secid == "USD000UTSTOM"),
+        None,
+    )
+    if usd_preferred:
+        return usd_preferred, "selected USD/RUB-related USD000UTSTOM instrument"
+    if candidates:
+        return candidates[0], "selected discovered CNY/USD-related currency instrument"
+    if securities:
+        return securities[
+            0
+        ], "no CNY/USD-related currency found; selected fallback currency instrument"
+    return None, "no currency securities returned"
 
 
 def main() -> int:
@@ -147,6 +204,14 @@ def main() -> int:
         ),
         "futures_forts_securities_columns.json": (
             build_securities_columns_path(DEFAULT_FUTURES_ENGINE, DEFAULT_FUTURES_MARKET),
+            None,
+        ),
+        "currency_selt_boards.json": (
+            build_boards_path(DEFAULT_CURRENCY_ENGINE, DEFAULT_CURRENCY_MARKET),
+            None,
+        ),
+        "currency_selt_securities_columns.json": (
+            build_securities_columns_path(DEFAULT_CURRENCY_ENGINE, DEFAULT_CURRENCY_MARKET),
             None,
         ),
     }
@@ -218,6 +283,44 @@ def main() -> int:
                     "params": futures_candle_params,
                 }
             snapshots["futures_snapshot_metadata.json"] = futures_metadata
+
+            currency_securities = _fetch_json(
+                client,
+                build_market_securities_path(DEFAULT_CURRENCY_ENGINE, DEFAULT_CURRENCY_MARKET),
+            )
+            currency_sample = _sample_currency_securities(currency_securities)
+            currency_candidates = parse_currency_securities(currency_securities)
+            selected_currency, currency_selection_note = _choose_currency_candidate(
+                currency_candidates
+            )
+            snapshots["currency_selt_securities_sample.json"] = currency_sample
+
+            currency_metadata: dict[str, Any] = {
+                "selection_note": currency_selection_note,
+                "selected_security": selected_currency.model_dump()
+                if selected_currency is not None
+                else None,
+            }
+            if selected_currency is not None:
+                currency_candle_path, currency_candle_params = build_candles_request(
+                    engine=DEFAULT_CURRENCY_ENGINE,
+                    market=DEFAULT_CURRENCY_MARKET,
+                    board=None,
+                    security=selected_currency.secid,
+                    from_date="2023-01-10",
+                    till_date="2023-01-20",
+                    timeframe=DEFAULT_TIMEFRAME,
+                    start=0,
+                )
+                currency_candles = _fetch_json(client, currency_candle_path, currency_candle_params)
+                snapshots["currency_selt_candles_sample.json"] = currency_candles
+                currency_metadata["candles"] = {
+                    "from": "2023-01-10",
+                    "till": "2023-01-20",
+                    "path": currency_candle_path,
+                    "params": currency_candle_params,
+                }
+            snapshots["currency_snapshot_metadata.json"] = currency_metadata
     except httpx.HTTPError as exc:
         print(f"MOEX ISS snapshots were not refreshed: {exc}", file=sys.stderr)
         return 1
@@ -241,6 +344,19 @@ def main() -> int:
         _write_json(
             FIXTURE_DIR / "moex_futures_candles_sample.json",
             snapshots["futures_forts_candles_sample.json"],
+        )
+    _write_json(
+        FIXTURE_DIR / "moex_currency_securities_sample.json",
+        snapshots["currency_selt_securities_sample.json"],
+    )
+    _write_json(
+        FIXTURE_DIR / "moex_currency_boards_sample.json",
+        snapshots["currency_selt_boards.json"],
+    )
+    if "currency_selt_candles_sample.json" in snapshots:
+        _write_json(
+            FIXTURE_DIR / "moex_currency_candles_sample.json",
+            snapshots["currency_selt_candles_sample.json"],
         )
 
     print(f"Saved MOEX ISS snapshots to {SNAPSHOT_DIR}")

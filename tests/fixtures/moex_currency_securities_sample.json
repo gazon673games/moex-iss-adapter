@@ -1,0 +1,362 @@
+{
+  "securities": {
+    "columns": [
+      "SECID",
+      "BOARDID",
+      "SHORTNAME",
+      "LOTSIZE",
+      "SETTLEDATE",
+      "DECIMALS",
+      "FACEVALUE",
+      "MARKETCODE",
+      "MINSTEP",
+      "PREVDATE",
+      "SECNAME",
+      "REMARKS",
+      "STATUS",
+      "FACEUNIT",
+      "PREVPRICE",
+      "PREVWAPRICE",
+      "CURRENCYID",
+      "LATNAME",
+      "LOTDIVIDER"
+    ],
+    "data": [
+      [
+        "CNY000000TOD",
+        "CETS",
+        "CNYRUB_TOD",
+        1000,
+        "2026-07-03",
+        5,
+        1,
+        "CURR",
+        0.0005,
+        "2026-07-02",
+        "CNY/RUB_TOD - CNY/РУБ",
+        null,
+        "A",
+        "CNY",
+        11.4895,
+        11.4599,
+        "RUB",
+        "CNY/RUB_TOD - CNY/RUB",
+        1
+      ],
+      [
+        "CNYRUBTODTOM",
+        "CETS",
+        "CNY_TODTOM",
+        100000,
+        "2026-07-03",
+        5,
+        1,
+        "CURR",
+        1e-05,
+        "2026-07-02",
+        "CNY_TODTOM - СВОП CNY/РУБ",
+        null,
+        "A",
+        "CNY",
+        0.00443,
+        0.00439,
+        "RUB",
+        "CNY_TODTOM - SWAP CNY/RUB",
+        1
+      ],
+      [
+        "CNYRUB_FWD",
+        "CETS",
+        "CNYRUB_LTV",
+        1000,
+        "2026-07-08",
+        5,
+        1,
+        "CURR",
+        1e-05,
+        "2026-07-02",
+        "CNYRUB_LTV - CNY/РУБ",
+        null,
+        "A",
+        "CNY",
+        null,
+        null,
+        "RUB",
+        "CNY/RUB_LTV - CNY/RUB",
+        1
+      ],
+      [
+        "CNYRUB_SPT",
+        "CETS",
+        "CNYRUB_SPT",
+        1000,
+        "2026-07-07",
+        5,
+        1,
+        "CURR",
+        0.0005,
+        "2026-07-02",
+        "CNY/RUB_SPT - CNY/РУБ",
+        null,
+        "A",
+        "CNY",
+        null,
+        null,
+        "RUB",
+        "CNY/RUB_SPT - CNY/RUB",
+        1
+      ],
+      [
+        "CNYRUB_TMS",
+        "CETS",
+        "CNYRUB_TMS",
+        1,
+        "2026-07-06",
+        6,
+        1,
+        "CURR",
+        0.0001,
+        "2026-07-02",
+        "CNY/RUB_TMS - CNY/РУБ",
+        null,
+        "A",
+        "CNY",
+        11.4906,
+        11.4594,
+        "RUB",
+        "CNY/RUB_TMS - CNY/RUB",
+        100
+      ],
+      [
+        "CNYRUB_TOM",
+        "CETS",
+        "CNYRUB_TOM",
+        1000,
+        "2026-07-06",
+        5,
+        1,
+        "CURR",
+        0.0005,
+        "2026-07-02",
+        "CNY/RUB_TOM - CNY/РУБ",
+        null,
+        "A",
+        "CNY",
+        11.462,
+        11.4618,
+        "RUB",
+        "CNY/RUB_TOM - CNY/RUB",
+        1
+      ],
+      [
+        "EURUSD000TOD",
+        "CETS",
+        "EURUSD_TOD",
+        1000,
+        "2026-07-03",
+        6,
+        1,
+        "CURR",
+        5e-05,
+        "2026-07-02",
+        "EUR/USD_TOD - EUR/USD",
+        null,
+        "A",
+        "EUR",
+        1.07155,
+        1.07667,
+        "USD",
+        "EUR/USD_TOD - EUR/USD",
+        1
+      ],
+      [
+        "EURUSD000TOM",
+        "CETS",
+        "EURUSD_TOM",
+        1000,
+        "2026-07-06",
+        6,
+        1,
+        "CURR",
+        5e-05,
+        "2026-07-02",
+        "EUR/USD_TOM - EUR/USD",
+        null,
+        "A",
+        "EUR",
+        1.07355,
+        1.07503,
+        "USD",
+        "EUR/USD_TOM - EUR/USD",
+        1
+      ],
+      [
+        "EURUSDTODTOM",
+        "CETS",
+        "EURUSDTDTM",
+        100000,
+        "2026-07-03",
+        6,
+        1,
+        "CURR",
+        1e-06,
+        "2026-07-02",
+        "EUR/USD_TODTOM - СВОП EUR/USD",
+        null,
+        "A",
+        "EUR",
+        5e-05,
+        9.5e-05,
+        "USD",
+        "EUR/USD_TODTOM - SWAP EUR/USD",
+        1
+      ],
+      [
+        "EURUSD_SPT",
+        "CETS",
+        "EURUSD_SPT",
+        1000,
+        "2026-07-07",
+        6,
+        1,
+        "CURR",
+        5e-05,
+        "2026-07-02",
+        "EUR/USD_SPT - EUR/USD",
+        null,
+        "A",
+        "EUR",
+        1.0045,
+        1.0045,
+        "USD",
+        "EUR/USD_SPT - EUR/USD",
+        1
+      ],
+      [
+        "EURUSD_TOM1D",
+        "CETS",
+        "EURUSDTMSP",
+        100000,
+        "2026-07-06",
+        6,
+        1,
+        "CURR",
+        1e-06,
+        "2026-07-02",
+        "EUR/USD_TOMSPT - СВОП EUR/USD",
+        null,
+        "A",
+        "EUR",
+        0,
+        0,
+        "USD",
+        "EUR/USD_TOMSPT - SWAP EUR/USD",
+        1
+      ],
+      [
+        "GBPUSDTODTOM",
+        "CETS",
+        "GBPUSDTDTM",
+        100000,
+        "2026-07-03",
+        6,
+        1,
+        "CURR",
+        1e-06,
+        "2026-07-02",
+        "GBP/USD_TODTOM - СВОП GBP/USD",
+        null,
+        "A",
+        "GBP",
+        -8e-06,
+        -8e-06,
+        "USD",
+        "GBP/USD_TODTOM - SWAP GBP/USD",
+        1
+      ]
+    ],
+    "metadata": {
+      "BOARDID": {
+        "bytes": 12,
+        "max_size": 0,
+        "type": "string"
+      },
+      "CURRENCYID": {
+        "bytes": 12,
+        "max_size": 0,
+        "type": "string"
+      },
+      "DECIMALS": {
+        "type": "int32"
+      },
+      "FACEUNIT": {
+        "bytes": 12,
+        "max_size": 0,
+        "type": "string"
+      },
+      "FACEVALUE": {
+        "type": "double"
+      },
+      "LATNAME": {
+        "bytes": 90,
+        "max_size": 0,
+        "type": "string"
+      },
+      "LOTDIVIDER": {
+        "type": "int32"
+      },
+      "LOTSIZE": {
+        "type": "int32"
+      },
+      "MARKETCODE": {
+        "bytes": 12,
+        "max_size": 0,
+        "type": "string"
+      },
+      "MINSTEP": {
+        "type": "double"
+      },
+      "PREVDATE": {
+        "bytes": 10,
+        "max_size": 0,
+        "type": "date"
+      },
+      "PREVPRICE": {
+        "type": "double"
+      },
+      "PREVWAPRICE": {
+        "type": "double"
+      },
+      "REMARKS": {
+        "bytes": 24,
+        "max_size": 0,
+        "type": "string"
+      },
+      "SECID": {
+        "bytes": 36,
+        "max_size": 0,
+        "type": "string"
+      },
+      "SECNAME": {
+        "bytes": 90,
+        "max_size": 0,
+        "type": "string"
+      },
+      "SETTLEDATE": {
+        "bytes": 10,
+        "max_size": 0,
+        "type": "date"
+      },
+      "SHORTNAME": {
+        "bytes": 30,
+        "max_size": 0,
+        "type": "string"
+      },
+      "STATUS": {
+        "bytes": 3,
+        "max_size": 0,
+        "type": "string"
+      }
+    }
+  }
+}

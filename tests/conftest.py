@@ -56,3 +56,28 @@ def futures_securities_empty_response() -> dict[str, Any]:
 @pytest.fixture()
 def futures_securities_malformed_response() -> dict[str, Any]:
     return load_fixture("moex_futures_securities_malformed.json")
+
+
+@pytest.fixture()
+def currency_securities_response() -> dict[str, Any]:
+    return load_fixture("moex_currency_securities_sample.json")
+
+
+@pytest.fixture()
+def currency_boards_response() -> dict[str, Any]:
+    return load_fixture("moex_currency_boards_sample.json")
+
+
+@pytest.fixture()
+def currency_candles_response() -> dict[str, Any]:
+    return load_fixture("moex_currency_candles_sample.json")
+
+
+@pytest.fixture()
+def empty_currency_securities_response() -> dict[str, Any]:
+    return load_fixture("moex_currency_empty_securities_response.json")
+
+
+@pytest.fixture()
+def malformed_currency_response() -> dict[str, Any]:
+    return load_fixture("moex_currency_malformed_response.json")

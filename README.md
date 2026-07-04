@@ -11,6 +11,8 @@ saving normalized data as Parquet, and running adapter-level quality checks.
 - Primary validation scenario: `stock` / `shares` / `TQBR` / `SBER` / `1d`.
 - Futures discovery and candles: `futures` / `forts` for concrete futures
   contract SECIDs.
+- Currency discovery and candles: `currency` / `selt` for concrete currency
+  SECIDs.
 - Storage: local files under `data/raw` and `data/normalized`.
 
 The adapter is not a backtest engine and does not contain strategies, order
@@ -101,6 +103,33 @@ uv run moex-iss futures candles \
 the adapter discovers the board from MOEX futures securities metadata and uses
 the market-level candle endpoint where available.
 
+Currency discovery:
+
+```bash
+uv run moex-iss currency search --query CNY
+uv run moex-iss currency search --query USD
+uv run moex-iss currency search --query RUB
+```
+
+Currency SECIDs can differ from intuitive pair names, so discover the concrete
+instrument first and then download candles for that SECID.
+
+Currency candle download:
+
+```bash
+uv run moex-iss currency candles \
+  --symbol <DISCOVERED_CURRENCY_SECID> \
+  --timeframe 1d \
+  --from-date 2023-01-10 \
+  --till-date 2023-01-20 \
+  --save-raw \
+  --save-normalized
+```
+
+`--board` may be supplied explicitly, for example `--board CETS`. If omitted,
+the adapter discovers the board from MOEX currency securities metadata and uses
+the market-level candle endpoint where available.
+
 Futures metadata snapshot:
 
 ```bash
@@ -170,6 +199,10 @@ Futures candles use the same storage layout with `engine=futures`,
 `market=forts`, the discovered or supplied futures board, and the concrete
 futures SECID as `symbol`.
 
+Currency candles use the same storage layout with `engine=currency`,
+`market=selt`, the discovered or supplied currency board, and the concrete
+currency SECID as `symbol`.
+
 Raw futures metadata snapshots are saved separately:
 
 ```text
@@ -226,6 +259,10 @@ Futures metadata such as `ASSETCODE`, `SHORTNAME`, `SECNAME`, `LASTTRADEDATE`,
 and `LASTDELDATE` is discovery metadata. It is not added to the canonical OHLCV
 schema.
 
+Currency metadata such as `FACEUNIT`, `CURRENCYID`, `LOTSIZE`, and `SETTLEDATE`
+is discovery metadata or raw-response data. It is not added to the canonical
+OHLCV schema.
+
 ## Futures Metadata Schema
 
 Normalized futures metadata uses this stable schema:
@@ -276,6 +313,7 @@ uv run pytest tests/integration -m integration
 - Primary validation symbol: `SBER`.
 - Primary timeframe: `1d`.
 - Futures support downloads concrete expiring futures contracts only.
+- Currency support downloads concrete `currency/selt` instruments only.
 - No continuous futures stitching.
 - No back-adjusted futures series.
 - No futures roll rules.

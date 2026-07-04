@@ -1,0 +1,14 @@
+{
+  "securities": {
+    "columns": [
+      "BOARDID",
+      "SHORTNAME"
+    ],
+    "data": [
+      [
+        "CETS",
+        "BROKEN"
+      ]
+    ]
+  }
+}

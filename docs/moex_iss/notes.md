@@ -24,3 +24,9 @@
 - Normalized futures metadata snapshots include a `snapshot_ts` column and a
   `raw_metadata` JSON string so searches can be reproduced against the exact
   discovered security set.
+- MOEX currency instruments live under `engine=currency` and `market=selt`.
+- Currency SECIDs are not always intuitive, so users should discover/search
+  securities first and then download candles for a concrete SECID.
+- Currency candles use the same canonical OHLCV schema as shares and futures.
+  Currency-specific metadata such as `FACEUNIT`, `CURRENCYID`, `LOTSIZE`, and
+  `SETTLEDATE` remains in discovery metadata or raw responses.

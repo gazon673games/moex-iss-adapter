@@ -75,6 +75,21 @@ class FuturesSecurity(AdapterBaseModel):
     prevopenposition: float | None = None
 
 
+class CurrencySecurity(AdapterBaseModel):
+    """Selected MOEX currency security metadata used for discovery."""
+
+    secid: str
+    boardid: str | None = None
+    shortname: str | None = None
+    secname: str | None = None
+    faceunit: str | None = None
+    currencyid: str | None = None
+    latname: str | None = None
+    marketcode: str | None = None
+    lotsize: float | None = None
+    settledate: str | None = None
+
+
 class QualityReport(AdapterBaseModel):
     """Structured quality validation result."""
 

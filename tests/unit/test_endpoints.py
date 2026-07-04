@@ -108,3 +108,37 @@ def test_builds_futures_board_specific_candles_request() -> None:
 
     assert path == "/engines/futures/markets/forts/boards/RFUD/securities/CNYRUBF/candles.json"
     assert params["interval"] == 24
+
+
+def test_builds_currency_securities_endpoint() -> None:
+    assert (
+        build_market_securities_path("currency", "selt")
+        == "/engines/currency/markets/selt/securities.json"
+    )
+
+
+def test_builds_currency_boards_endpoint() -> None:
+    assert build_boards_path("currency", "selt") == "/engines/currency/markets/selt/boards.json"
+
+
+def test_builds_currency_market_level_candles_endpoint() -> None:
+    assert (
+        build_market_candles_path("currency", "selt", "CNY000000TOD")
+        == "/engines/currency/markets/selt/securities/CNY000000TOD/candles.json"
+    )
+
+
+def test_builds_currency_board_specific_candles_request() -> None:
+    path, params = build_candles_request(
+        engine="currency",
+        market="selt",
+        board="CETS",
+        security="CNY000000TOD",
+        timeframe="1d",
+        from_date="2023-01-10",
+        till_date="2023-01-20",
+        start=0,
+    )
+
+    assert path == "/engines/currency/markets/selt/boards/CETS/securities/CNY000000TOD/candles.json"
+    assert params["interval"] == 24

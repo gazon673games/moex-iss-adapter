@@ -1,0 +1,26 @@
+{
+  "candles": {
+    "from": "2023-01-10",
+    "params": {
+      "from": "2023-01-10",
+      "interval": 24,
+      "start": 0,
+      "till": "2023-01-20"
+    },
+    "path": "/engines/currency/markets/selt/securities/CNY000000TOD/candles.json",
+    "till": "2023-01-20"
+  },
+  "selected_security": {
+    "boardid": "CETS",
+    "currencyid": "RUB",
+    "faceunit": "CNY",
+    "latname": "CNY/RUB_TOD - CNY/RUB",
+    "lotsize": 1000.0,
+    "marketcode": "CURR",
+    "secid": "CNY000000TOD",
+    "secname": "CNY/RUB_TOD - CNY/РУБ",
+    "settledate": "2026-07-03",
+    "shortname": "CNYRUB_TOD"
+  },
+  "selection_note": "selected CNY/RUB-related CNY000000TOD instrument"
+}
