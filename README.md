@@ -247,6 +247,46 @@ No `--contract-list-file` option is needed for the current historical CNY/RUB
 audit: the existing search filters and repeated `--include-secid` options are
 sufficient.
 
+## USD/RUB futures control dataset
+
+`Si*` is a useful control family when investigating sparse CNY/RUB history: it
+is a historically more liquid USD/RUB futures family, and it should produce a
+much denser set of concrete contracts if the adapter discovery and download
+path is healthy.
+
+Use the same universal futures controls. Do not add USD/RUB-specific code.
+The broad text query `Si` can match non-target families such as `SILV`,
+`SILVM`, `SIBN`, or `AFKS`. For historical discovery, the clean control query
+is the Russian instrument text plus the SECID prefix:
+
+```bash
+uv run moex-iss futures search \
+  --query "доллар" \
+  --include-expired \
+  --secid-prefix Si \
+  --limit 200
+```
+
+Download concrete daily `Si*` contracts:
+
+```bash
+uv run moex-iss futures prepare-chain-data \
+  --query "доллар" \
+  --secid-prefix Si \
+  --include-expired \
+  --timeframe 1d \
+  --from-date 2015-01-01 \
+  --till-date 2026-01-01 \
+  --use-contract-date-ranges \
+  --min-successful-contracts 20 \
+  --save-raw \
+  --save-normalized \
+  --overwrite
+```
+
+This adapter still downloads only concrete futures contracts. It does not
+choose a roll rule, back-adjust prices, or build a continuous USD/RUB series.
+
 Validate the adapter output in `ohlcv-data-store`:
 
 ```bash
