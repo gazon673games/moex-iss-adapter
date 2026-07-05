@@ -61,6 +61,43 @@ CLI also supports explicit `--include-secid` fallback, so known historical
 SECIDs can be downloaded even when they are absent from the current metadata
 snapshot.
 
+## Historical CNY/RUB Coverage Audit
+
+Checked on 2026-07-05 with the existing universal CLI parameters only:
+
+- `futures search --query CNY --include-expired --secid-prefix CR` returned
+  `CRU2` and newer CR contracts. It did not discover a CR contract before
+  `CRU2`.
+- `futures search --asset-code CNY --include-expired` produced the same CR
+  coverage starting at `CRU2`.
+- `futures search --query CNYRUB --include-expired` returned only `CNYRUBF`.
+- `futures search --query юань --include-expired` worked with Cyrillic input
+  and exposed older yuan-related candidates. The mojibake form
+  `СЋР°РЅСЊ` returned no matches.
+- `futures search --query CY --include-expired --secid-prefix CY` returned the
+  older CY family from `CYM5_2015` through `CYM2`.
+
+Download checks:
+
+- `prepare-chain-data --query CNY --secid-prefix CR --include-expired` found
+  and downloaded CR contracts from `CRU2` onward. `CRU2` had 90 rows with
+  `min_ts=2022-05-12` and `max_ts=2022-09-15`.
+- Explicit `--include-secid CRM2 --include-secid CRU2 --include-secid CRZ2`
+  downloaded `CRM2` with 36 rows from `2022-04-21` through `2022-06-16`.
+- `prepare-chain-data --query CY --secid-prefix CY --include-expired`
+  downloaded 25 CY contracts. The earliest available candle was `CYM5_2015`
+  on `2015-03-17`; four selected CY contracts had no candle rows.
+
+No CNY/RUB-specific code is needed for this. The current universal mechanisms
+are sufficient: `--query`, `--secid-prefix`, `--asset-code`, repeated
+`--include-secid`, `--include-expired`, date bounds, and
+`--use-contract-date-ranges`. A `--contract-list-file` option is not needed for
+the current audit because repeated `--include-secid` covers explicit lists and
+search covers the CY family.
+
+These findings are an adapter data-availability result. Continuous chain
+selection, roll policy, and stitching remain outside this repository.
+
 Use `scripts/probe_futures_history.py` for a bounded live probe report. The
 script prints endpoint, status, row count, columns, sample SECIDs, and notes
 without downloading large datasets.

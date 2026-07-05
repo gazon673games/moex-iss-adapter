@@ -123,6 +123,34 @@ different MOEX families: `CR*`, `MY*`, `UC*`, and `CNYRUBF`. Use
 `--secid-prefix CR` for the CR family, or pass an explicit `--include-secid`
 list when you already know the historical SECIDs.
 
+Historical coverage audit on 2026-07-05 found that `--query CNY
+--secid-prefix CR --include-expired` discovers `CRU2` and newer CR contracts,
+with `CRU2` candles starting on `2022-05-12`. The earlier `CRM2` contract can
+be downloaded with explicit `--include-secid CRM2`; its available candles run
+from `2022-04-21` through `2022-06-16`.
+
+The same audit found an older CY family using only universal parameters:
+
+```bash
+uv run moex-iss futures search --query CY --include-expired --secid-prefix CY
+uv run moex-iss futures prepare-chain-data \
+  --query CY \
+  --secid-prefix CY \
+  --include-expired \
+  --timeframe 1d \
+  --from-date 2015-01-01 \
+  --till-date 2022-12-31 \
+  --use-contract-date-ranges \
+  --min-successful-contracts 1 \
+  --save-raw \
+  --save-normalized \
+  --overwrite
+```
+
+That command downloaded 25 CY contracts, with the earliest available candle on
+`2015-03-17` (`CYM5_2015`). This is still adapter behavior over concrete SECIDs:
+it does not imply any roll rule or continuous series construction.
+
 MOEX ISS exposes expired candidates through the global securities search
 endpoint for bounded queries such as `q=CNY`, and `/securities/<SECID>.json`
 provides per-contract board and date metadata when available. There is still no
@@ -177,6 +205,22 @@ Explicit SECID fallback:
 
 ```bash
 uv run moex-iss futures prepare-chain-data \
+  --include-secid CRM2 \
+  --include-secid CRU2 \
+  --include-secid CRZ2 \
+  --timeframe 1d \
+  --from-date 2015-01-01 \
+  --till-date 2022-12-31 \
+  --use-contract-date-ranges \
+  --save-raw \
+  --save-normalized \
+  --overwrite
+```
+
+Longer explicit lists are still supported through repeated `--include-secid`:
+
+```bash
+uv run moex-iss futures prepare-chain-data \
   --include-secid CRH5 \
   --include-secid CRM5 \
   --include-secid CRU5 \
@@ -198,6 +242,10 @@ If a manually included SECID is absent from the current futures metadata
 snapshot, the adapter still tries the futures candle endpoint using the explicit
 SECID and reports `metadata_found`, `candles_found`, `row_count`, and
 `skip_reason`.
+
+No `--contract-list-file` option is needed for the current historical CNY/RUB
+audit: the existing search filters and repeated `--include-secid` options are
+sufficient.
 
 Validate the adapter output in `ohlcv-data-store`:
 
