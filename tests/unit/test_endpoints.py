@@ -49,6 +49,7 @@ def test_builds_candles_request_params() -> None:
 def test_timeframe_mapping_is_centralized() -> None:
     assert TIMEFRAME_TO_MOEX_INTERVAL == {
         "1m": 1,
+        "5m": 1,
         "10m": 10,
         "1h": 60,
         "1d": 24,
@@ -57,6 +58,7 @@ def test_timeframe_mapping_is_centralized() -> None:
         "1q": 4,
     }
     assert moex_interval_for_timeframe("1d") == 24
+    assert moex_interval_for_timeframe("5m") == 1
 
 
 def test_rejects_unknown_timeframe() -> None:

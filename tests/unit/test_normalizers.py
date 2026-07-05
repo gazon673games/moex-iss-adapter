@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import polars as pl
 import pytest
 
@@ -66,6 +68,57 @@ def test_empty_response_returns_empty_canonical_frame(empty_candles_response: di
 
     assert frame.columns == list(CANONICAL_OHLCV_COLUMNS)
     assert frame.height == 0
+
+
+def test_normalized_candles_can_use_5m_timeframe(futures_candles_response: dict) -> None:
+    frame = normalize_candles(
+        [futures_candles_response],
+        engine="futures",
+        market="forts",
+        board="RFUD",
+        symbol="CRU6",
+        timeframe="5m",
+    )
+
+    assert set(frame["timeframe"].to_list()) == {"5m"}
+    assert set(frame["symbol"].to_list()) == {"CRU6"}
+    assert "begin" not in frame.columns
+
+
+def test_5m_timeframe_aggregates_1m_candles() -> None:
+    response = {
+        "candles": {
+            "columns": ["begin", "open", "high", "low", "close", "volume", "value"],
+            "data": [
+                ["2026-07-01 10:00:00", 10.0, 11.0, 9.0, 10.5, 1.0, 100.0],
+                ["2026-07-01 10:01:00", 10.5, 12.0, 10.0, 11.5, 2.0, 200.0],
+                ["2026-07-01 10:04:00", 11.5, 13.0, 11.0, 12.5, 3.0, 300.0],
+                ["2026-07-01 10:05:00", 12.5, 13.5, 12.0, 13.0, 4.0, 400.0],
+            ],
+        }
+    }
+
+    frame = normalize_candles(
+        [response],
+        engine="futures",
+        market="forts",
+        board="RFUD",
+        symbol="CRU6",
+        timeframe="5m",
+    )
+
+    assert frame.height == 2
+    assert frame.get_column("ts").to_list() == [
+        datetime(2026, 7, 1, 10, 0),
+        datetime(2026, 7, 1, 10, 5),
+    ]
+    first = frame.row(0, named=True)
+    assert first["open"] == 10.0
+    assert first["high"] == 13.0
+    assert first["low"] == 9.0
+    assert first["close"] == 12.5
+    assert first["volume"] == 6.0
+    assert first["value"] == 600.0
 
 
 def test_malformed_response_raises_response_format_error(malformed_response: dict) -> None:

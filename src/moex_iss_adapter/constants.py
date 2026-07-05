@@ -75,6 +75,9 @@ FORBIDDEN_NORMALIZED_TIMESTAMP_COLUMNS: Final[tuple[str, ...]] = (
 
 TIMEFRAME_TO_MOEX_INTERVAL: Final[dict[str, int]] = {
     "1m": 1,
+    # MOEX ISS does not expose native 5-minute candles for FORTS in this workflow.
+    # The adapter requests 1-minute candles and normalizes them into 5-minute bars.
+    "5m": 1,
     "10m": 10,
     "1h": 60,
     "1d": 24,

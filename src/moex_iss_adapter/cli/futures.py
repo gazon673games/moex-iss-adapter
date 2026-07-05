@@ -17,6 +17,10 @@ from moex_iss_adapter.constants import (
     DEFAULT_FUTURES_MARKET,
     DEFAULT_TIMEFRAME,
 )
+from moex_iss_adapter.diagnostics import (
+    find_normalized_candle_paths,
+    write_intraday_coverage_report,
+)
 from moex_iss_adapter.downloads.futures import (
     download_futures_candles,
     search_futures_securities,
@@ -33,6 +37,40 @@ from moex_iss_adapter.futures_history import contract_is_expired
 from moex_iss_adapter.models import FuturesBulkResult
 
 futures_app = typer.Typer(help="MOEX futures discovery and candle commands.")
+
+
+@futures_app.command("coverage-report")
+def futures_coverage_report(
+    timeframe: Annotated[str, typer.Option("--timeframe")] = "5m",
+    secid_prefix: Annotated[
+        str | None,
+        typer.Option("--secid-prefix", help="Keep SECIDs starting with this prefix"),
+    ] = None,
+    board: Annotated[str, typer.Option("--board")] = "RFUD",
+    data_root: Annotated[Path, typer.Option("--data-root")] = Path("data"),
+    output_path: Annotated[
+        Path,
+        typer.Option("--output-path", help="Coverage diagnostics JSON output path."),
+    ] = Path("data/reports/futures_5m_cny_cr_coverage.json"),
+    csv_path: Annotated[
+        Path | None,
+        typer.Option("--csv-path", help="Optional coverage diagnostics CSV output path."),
+    ] = None,
+) -> None:
+    """Write intraday coverage diagnostics for saved normalized futures candles."""
+
+    paths = find_normalized_candle_paths(
+        data_root=data_root,
+        board=board,
+        timeframe=timeframe,
+        symbol_prefix=secid_prefix,
+    )
+    report = write_intraday_coverage_report(paths, json_path=output_path, csv_path=csv_path)
+    typer.echo(f"coverage_report_path: {output_path}")
+    if csv_path is not None:
+        typer.echo(f"coverage_report_csv_path: {csv_path}")
+    typer.echo(f"coverage_report_contracts: {report['summary']['contracts_reported']}")
+    typer.echo(f"coverage_report_total_rows: {report['summary']['total_rows']}")
 
 
 def _print_prepare_chain_data_result(result: FuturesBulkResult) -> None:
@@ -297,6 +335,20 @@ def futures_prepare_chain_data(
     save_raw: Annotated[bool, typer.Option("--save-raw")] = False,
     save_normalized: Annotated[bool, typer.Option("--save-normalized")] = False,
     data_root: Annotated[Path, typer.Option("--data-root")] = Path("data"),
+    coverage_report_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--coverage-report-path",
+            help="Write intraday coverage diagnostics JSON for downloaded normalized candles.",
+        ),
+    ] = None,
+    coverage_report_csv_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--coverage-report-csv-path",
+            help="Optionally write intraday coverage diagnostics CSV.",
+        ),
+    ] = None,
     overwrite: Annotated[bool, typer.Option("--overwrite")] = False,
     verbose: Annotated[bool, typer.Option("--verbose")] = False,
 ) -> None:
@@ -329,6 +381,17 @@ def futures_prepare_chain_data(
         raise typer.Exit(code=1) from exc
 
     _print_prepare_chain_data_result(result)
+    if coverage_report_path is not None:
+        report = write_intraday_coverage_report(
+            result.normalized_paths,
+            json_path=coverage_report_path,
+            csv_path=coverage_report_csv_path,
+        )
+        typer.echo(f"coverage_report_path: {coverage_report_path}")
+        if coverage_report_csv_path is not None:
+            typer.echo(f"coverage_report_csv_path: {coverage_report_csv_path}")
+        typer.echo(f"coverage_report_contracts: {report['summary']['contracts_reported']}")
+        typer.echo(f"coverage_report_total_rows: {report['summary']['total_rows']}")
     if not result.meets_min_successful_contracts:
         downstream_note = (
             " Downstream continuous futures research needs at least 2 concrete contracts "

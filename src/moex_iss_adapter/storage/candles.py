@@ -8,6 +8,7 @@ from typing import Any
 import polars as pl
 
 from moex_iss_adapter.constants import DEFAULT_SOURCE
+from moex_iss_adapter.endpoints import moex_interval_for_timeframe
 from moex_iss_adapter.storage.io import ensure_writable, write_json_payload, write_parquet_frame
 from moex_iss_adapter.storage.paths import build_normalized_candles_path, build_raw_candles_path
 
@@ -44,6 +45,7 @@ def save_raw_candles(
             "board": board,
             "symbol": symbol,
             "timeframe": timeframe,
+            "moex_interval": moex_interval_for_timeframe(timeframe),
             "from_date": from_date,
             "till_date": till_date,
         },

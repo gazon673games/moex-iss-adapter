@@ -158,4 +158,43 @@ def normalize_candles(
         msg = "Failed to normalize MOEX candle response"
         raise MoexNormalizationError(msg) from exc
 
+    if timeframe == "5m":
+        return _aggregate_to_5m(normalized)
     return normalized
+
+
+def _aggregate_to_5m(frame: pl.DataFrame) -> pl.DataFrame:
+    if frame.is_empty():
+        return frame
+
+    try:
+        return (
+            frame.with_columns(pl.col("ts").dt.truncate("5m").alias("ts"))
+            .group_by(
+                [
+                    "source",
+                    "exchange",
+                    "engine",
+                    "market",
+                    "board",
+                    "symbol",
+                    "timeframe",
+                    "ts",
+                ],
+                maintain_order=True,
+            )
+            .agg(
+                pl.col("open").first(),
+                pl.col("high").max(),
+                pl.col("low").min(),
+                pl.col("close").last(),
+                pl.col("volume").sum(),
+                pl.col("value").sum(),
+                pl.col("currency").drop_nulls().first(),
+            )
+            .select(CANONICAL_OHLCV_COLUMNS)
+            .sort("ts")
+        )
+    except pl.PolarsError as exc:
+        msg = "Failed to aggregate MOEX candle response to 5m timeframe"
+        raise MoexNormalizationError(msg) from exc

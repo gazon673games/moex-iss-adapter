@@ -222,6 +222,7 @@ def test_no_empty_normalized_parquet_is_written_for_no_row_contract(
     result = prepare_futures_chain_data(
         query="cny",
         include_secids=["CRU6"],
+        timeframe="5m",
         from_date="2023-01-10",
         till_date="2023-01-20",
         save_raw=True,
@@ -239,6 +240,37 @@ def test_no_empty_normalized_parquet_is_written_for_no_row_contract(
     assert result.skipped_contracts[0].reason == "no_rows"
     assert raw_candle_files
     assert not candle_root.exists()
+
+
+def test_bulk_5m_download_writes_timeframe_partition(
+    futures_securities_response: dict,
+    futures_candles_response: dict,
+    empty_candles_response: dict,
+    tmp_path,
+) -> None:
+    client = FakeBulkFuturesClient(
+        futures_securities_response,
+        pages_by_symbol={"CRU6": [futures_candles_response, empty_candles_response]},
+    )
+
+    result = prepare_futures_chain_data(
+        query="cny",
+        include_secids=["CRU6"],
+        timeframe="5m",
+        from_date="2023-01-10",
+        till_date="2023-01-20",
+        save_normalized=True,
+        data_root=tmp_path,
+        overwrite=True,
+        client=client,  # type: ignore[arg-type]
+        config=MoexIssConfig(max_pages=10),
+    )
+
+    normalized_path = result.normalized_paths[0]
+    loaded = pl.read_parquet(normalized_path)
+
+    assert "timeframe=5m" in normalized_path.as_posix()
+    assert set(loaded["timeframe"].to_list()) == {"5m"}
 
 
 def test_manual_include_secid_downloads_without_metadata_row(

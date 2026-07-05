@@ -74,6 +74,7 @@ def test_saves_raw_json(sber_candles_response: dict, tmp_path) -> None:
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["metadata"]["symbol"] == "SBER"
+    assert payload["metadata"]["moex_interval"] == 24
     columns = payload["pages"][0]["candles"]["columns"]
     begin_index = columns.index("begin")
     assert payload["pages"][0]["candles"]["data"][0][begin_index] == "2023-01-10 00:00:00"
@@ -107,3 +108,19 @@ def test_saves_normalized_parquet(sber_candles_response: dict, tmp_path) -> None
     loaded = pl.read_parquet(path)
     assert loaded.shape == frame.shape
     assert loaded.columns == frame.columns
+
+
+def test_builds_5m_futures_storage_path(tmp_path) -> None:
+    normalized_path = build_normalized_candles_path(
+        data_root=tmp_path,
+        engine="futures",
+        market="forts",
+        board="RFUD",
+        symbol="CRU6",
+        timeframe="5m",
+    )
+
+    assert normalized_path.as_posix().endswith(
+        "normalized/candles/exchange=MOEX/engine=futures/market=forts/board=RFUD/"
+        "symbol=CRU6/timeframe=5m/part-000.parquet"
+    )

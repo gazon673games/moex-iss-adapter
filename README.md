@@ -181,6 +181,82 @@ and skipped contracts. Empty no-row candle responses are reported and do not
 produce normalized candle Parquet. It does not stitch contracts, roll contracts,
 back-adjust prices, or build a continuous futures series.
 
+## CNY/RUB futures 5m intraday dataset
+
+The intraday CNY/RUB research pipeline starts here with concrete `CR*` futures
+candles. This adapter prepares raw MOEX responses and normalized 5-minute OHLCV
+Parquet for each concrete contract. It does not build a nearest-contract
+dataset, continuous futures series, strategy, or backtest.
+
+MOEX ISS did not return rows for native `interval=5` during the 2026-07-05
+smoke. The adapter therefore treats public `--timeframe 5m` as a derived
+timeframe: it requests MOEX 1-minute candles and aggregates them into normalized
+5-minute bars with `timeframe = "5m"`.
+
+Broad CR discovery command:
+
+```bash
+uv run moex-iss futures prepare-chain-data \
+  --query "CNY" \
+  --secid-prefix CR \
+  --asset-code CNY \
+  --include-expired \
+  --from-date 2022-01-01 \
+  --till-date 2026-07-05 \
+  --timeframe 5m \
+  --use-contract-date-ranges \
+  --save-raw \
+  --save-normalized \
+  --coverage-report-path data/reports/futures_5m_cny_cr_coverage.json \
+  --coverage-report-csv-path data/reports/futures_5m_cny_cr_coverage.csv \
+  --overwrite
+```
+
+For long historical ranges, the same workflow can be run in smaller explicit
+SECID chunks with repeated `--include-secid` flags, then summarized with:
+
+```bash
+uv run moex-iss futures coverage-report \
+  --timeframe 5m \
+  --secid-prefix CR \
+  --output-path data/reports/futures_5m_cny_cr_coverage.json \
+  --csv-path data/reports/futures_5m_cny_cr_coverage.csv
+```
+
+Output path pattern:
+
+```text
+data/normalized/candles/exchange=MOEX/engine=futures/market=forts/board=RFUD/symbol=<SECID>/timeframe=5m/part-000.parquet
+```
+
+Raw MOEX responses are preserved under the matching raw candle storage tree.
+The raw JSON metadata includes the public timeframe and the MOEX request
+interval used to fetch source pages.
+
+The 2026-07-05 smoke produced normalized 5m Parquet for 22 `CR*` contracts,
+from `CRU2` through `CRZ7`, with 414,238 total rows. Coverage was:
+
+```text
+min_ts = 2022-05-12T10:20:00
+max_ts = 2026-07-03T23:45:00
+largest_contract_by_rows = CRZ5
+report = data/reports/futures_5m_cny_cr_coverage.json
+```
+
+The coverage report lists per-contract `row_count`, `min_ts`, `max_ts`,
+`trading_day_count`, duplicate timestamp count, null OHLC count, maximum
+same-day intraday gap in minutes, and large-gap count where a large gap is
+greater than 30 minutes within the same trading day. Large gaps are diagnostic
+only; this adapter does not apply a market-session calendar.
+
+Known limitations:
+
+- concrete contracts only, not nearest-contract or continuous data
+- 5m bars are derived from MOEX 1m candles
+- no market-session calendar or lunch/evening-session modeling
+- no backtesting, strategy logic, or decision-time execution in this repository
+- no generated `data/` outputs should be committed
+
 Optional filters:
 
 ```bash
