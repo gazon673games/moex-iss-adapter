@@ -15,9 +15,6 @@ from moex_iss_adapter.downloads._futures_bulk_filters import (
     _casefold_set,
     _contract_sort_key,
 )
-from moex_iss_adapter.downloads._futures_bulk_metadata import (
-    _contract_key,
-)
 from moex_iss_adapter.downloads.candles import (
     CandleDownloadRequest,
     download_candle_pages,
@@ -45,9 +42,9 @@ def _merge_contracts(
     additions: Iterable[FuturesChainContract],
 ) -> list[FuturesChainContract]:
     result = list(contracts)
-    seen = {_contract_key(contract.secid) for contract in result}
+    seen = {contract.secid.casefold() for contract in result}
     for contract in additions:
-        key = _contract_key(contract.secid)
+        key = contract.secid.casefold()
         if key in seen:
             continue
         seen.add(key)
@@ -65,14 +62,14 @@ def _manual_include_contracts(
     config: MoexIssConfig,
     client: MoexIssClient,
 ) -> list[FuturesChainContract]:
-    selected = {_contract_key(contract.secid) for contract in selected_contracts}
+    selected = {contract.secid.casefold() for contract in selected_contracts}
     excluded = _casefold_set(exclude_secids)
     additions: list[FuturesChainContract] = []
     for raw_secid in include_secids or ():
         secid = raw_secid.strip()
         if not secid:
             continue
-        key = _contract_key(secid)
+        key = secid.casefold()
         if key in selected or key in excluded:
             continue
         try:

@@ -194,7 +194,3 @@ def _fetch_metadata_snapshot(
         normalized_path=normalized_path,
         quality_report=quality_report,
     )
-
-
-def _contract_key(secid: str) -> str:
-    return secid.casefold()

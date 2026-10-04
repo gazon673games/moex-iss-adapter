@@ -25,7 +25,6 @@ from moex_iss_adapter.downloads._futures_bulk_filters import _parse_user_date as
 from moex_iss_adapter.downloads._futures_bulk_filters import (
     derive_contract_date_range as derive_contract_date_range,
 )
-from moex_iss_adapter.downloads._futures_bulk_metadata import _contract_key as _contract_key
 from moex_iss_adapter.downloads._futures_bulk_metadata import (
     _fetch_metadata_snapshot as _fetch_metadata_snapshot,
 )
