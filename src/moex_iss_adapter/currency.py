@@ -88,35 +88,21 @@ def search_currency(
                 for field in CURRENCY_SEARCH_FIELDS
             )
         ]
-    if secid:
-        secid_text = secid.casefold()
-        result = [
-            security for security in result if secid_text in str(security.secid or "").casefold()
-        ]
-    if short_name:
-        short_text = short_name.casefold()
-        result = [
-            security
-            for security in result
-            if short_text in str(security.shortname or "").casefold()
-        ]
-    if security_name:
-        name_text = security_name.casefold()
-        result = [
-            security for security in result if name_text in str(security.secname or "").casefold()
-        ]
-    if face_unit:
-        face_text = face_unit.casefold()
-        result = [
-            security for security in result if face_text in str(security.faceunit or "").casefold()
-        ]
-    if currency_id:
-        currency_text = currency_id.casefold()
-        result = [
-            security
-            for security in result
-            if currency_text in str(security.currencyid or "").casefold()
-        ]
+    filters = (
+        ("secid", secid),
+        ("shortname", short_name),
+        ("secname", security_name),
+        ("faceunit", face_unit),
+        ("currencyid", currency_id),
+    )
+    for field, value in filters:
+        if value:
+            needle = value.casefold()
+            result = [
+                security
+                for security in result
+                if needle in str(getattr(security, field) or "").casefold()
+            ]
     return result
 
 

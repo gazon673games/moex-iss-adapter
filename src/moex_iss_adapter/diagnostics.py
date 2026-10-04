@@ -42,7 +42,7 @@ def find_normalized_candle_paths(
         if symbol_prefix and not symbol.upper().startswith(symbol_prefix.upper()):
             continue
         paths.append(path)
-    return sorted(paths, key=lambda item: item.as_posix())
+    return sorted(paths, key=Path.as_posix)
 
 
 def intraday_coverage_record(frame: pl.DataFrame, *, symbol: str | None = None) -> dict[str, Any]:
@@ -101,7 +101,7 @@ def intraday_coverage_report(paths: list[Path]) -> dict[str, Any]:
     """Build a JSON-serializable intraday coverage report for normalized Parquet files."""
 
     records = []
-    for path in sorted(paths, key=lambda item: item.as_posix()):
+    for path in sorted(paths, key=Path.as_posix):
         frame = pl.read_parquet(path)
         records.append({**intraday_coverage_record(frame), "path": path.as_posix()})
 
@@ -136,14 +136,15 @@ def write_intraday_coverage_report(
     """Write intraday coverage diagnostics as JSON and optionally CSV."""
 
     report = intraday_coverage_report(paths)
+    serializable_report = _json_ready(report)
     json_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(
-        json.dumps(_json_ready(report), indent=2, sort_keys=True) + "\n",
+        json.dumps(serializable_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     if csv_path is not None:
         csv_path.parent.mkdir(parents=True, exist_ok=True)
-        pl.DataFrame(_json_ready(report)["contracts"]).write_csv(csv_path)
+        pl.DataFrame(serializable_report["contracts"]).write_csv(csv_path)
     return report
 
 

@@ -58,7 +58,8 @@ def validate_candles(frame: pl.DataFrame) -> QualityReport:
 
     min_ts, max_ts = _min_max_ts(frame)
 
-    if _null_count(frame, "ts") > 0:
+    ts_nulls = _null_count(frame, "ts")
+    if ts_nulls > 0:
         issues.append("Column ts contains null values")
 
     for column in ("open", "high", "low", "close"):
@@ -73,10 +74,8 @@ def validate_candles(frame: pl.DataFrame) -> QualityReport:
             f"{duplicate_count}"
         )
 
-    if _null_count(frame, "ts") == 0:
-        ts_values = frame.get_column("ts").to_list()
-        if ts_values != sorted(ts_values):
-            issues.append("Rows are not sorted by ts")
+    if ts_nulls == 0 and not frame.get_column("ts").is_sorted():
+        issues.append("Rows are not sorted by ts")
 
     comparisons = (
         ("high must be greater than or equal to open", pl.col("high") < pl.col("open")),

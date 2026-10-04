@@ -31,15 +31,15 @@ def sample_futures_securities(payload: dict[str, Any], limit: int = 12) -> dict[
     table = payload["securities"]
     columns = table["columns"]
     rows = table["data"]
-    cny_rows = [
-        row
-        for row in rows
-        if any(
-            token in str(_row_dict(columns, row).get(field, "")).casefold()
+    cny_rows = []
+    for row in rows:
+        values = _row_dict(columns, row)
+        text = " ".join(
+            str(values.get(field, "")).casefold()
             for field in ("secid", "shortname", "secname", "assetcode", "latname")
-            for token in ("cny", "yuan", "rmb", "ucny")
         )
-    ]
+        if any(token in text for token in ("cny", "yuan", "rmb", "ucny")):
+            cny_rows.append(row)
     if cny_rows:
         selected_rows = cny_rows[:limit]
     else:
@@ -55,23 +55,20 @@ def sample_currency_securities(payload: dict[str, Any], limit: int = 12) -> dict
     table = payload["securities"]
     columns = table["columns"]
     rows = table["data"]
-    cny_rows = [
-        row
-        for row in rows
-        if any(
-            "cny" in str(_row_dict(columns, row).get(field, "")).casefold()
+    cny_rows = []
+    usd_rows = []
+    for row in rows:
+        values = _row_dict(columns, row)
+        text = " ".join(
+            str(values.get(field, "")).casefold()
             for field in ("secid", "shortname", "secname", "faceunit", "currencyid", "latname")
         )
-    ]
-    usd_rows = [
-        row
-        for row in rows
-        if any(
-            "usd" in str(_row_dict(columns, row).get(field, "")).casefold()
-            for field in ("secid", "shortname", "secname", "faceunit", "currencyid", "latname")
-        )
-    ]
-    preferred_rows = [*cny_rows[: limit // 2], *usd_rows[: limit - (limit // 2)]]
+        if "cny" in text:
+            cny_rows.append(row)
+        if "usd" in text:
+            usd_rows.append(row)
+    preferred_rows = cny_rows[: limit // 2]
+    preferred_rows.extend(usd_rows[: limit - (limit // 2)])
     selected_rows = preferred_rows[:limit] if preferred_rows else rows[:limit]
     return _sample_table(payload, "securities", selected_rows)
 

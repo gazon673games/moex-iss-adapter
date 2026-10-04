@@ -58,3 +58,20 @@ def test_quality_reports_empty_frame(empty_candles_response: dict) -> None:
     assert not report.passed
     assert report.row_count == 0
     assert "DataFrame is empty" in report.issues
+
+
+def test_quality_reports_unsorted_timestamps(sber_candles_response: dict) -> None:
+    report = validate_candles(_normalized(sber_candles_response).reverse())
+
+    assert not report.passed
+    assert "Rows are not sorted by ts" in report.issues
+
+
+def test_quality_reports_null_timestamps_without_sorting_error(sber_candles_response: dict) -> None:
+    frame = _normalized(sber_candles_response).with_columns(pl.lit(None).alias("ts"))
+
+    report = validate_candles(frame)
+
+    assert not report.passed
+    assert "Column ts contains null values" in report.issues
+    assert "Rows are not sorted by ts" not in report.issues
