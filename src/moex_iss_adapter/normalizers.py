@@ -49,7 +49,9 @@ def _get_table(response: Mapping[str, Any], table_name: str) -> Mapping[str, Any
     return table
 
 
-def parse_moex_table(response: Mapping[str, Any], table_name: str) -> list[dict[str, Any]]:
+def parse_moex_table(
+    response: Mapping[str, Any], table_name: str, *, normalize_column_names: bool = True
+) -> list[dict[str, Any]]:
     """Parse a MOEX table object with `columns` and `data` by column name."""
 
     table = _get_table(response, table_name)
@@ -63,7 +65,11 @@ def parse_moex_table(response: Mapping[str, Any], table_name: str) -> list[dict[
         msg = f"MOEX ISS table {table_name!r} must contain a data list"
         raise MoexResponseFormatError(msg)
 
-    normalized_columns = [column.lower() for column in columns]
+    normalized_columns = (
+        [column.lower() for column in columns] if normalize_column_names else columns
+    )
+    if len(set(normalized_columns)) != len(columns):
+        raise MoexResponseFormatError(f"MOEX ISS table {table_name!r} contains duplicate columns")
     rows: list[dict[str, Any]] = []
     for row_number, row in enumerate(data):
         if not isinstance(row, list):

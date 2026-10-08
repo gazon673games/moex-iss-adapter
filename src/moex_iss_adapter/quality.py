@@ -63,6 +63,11 @@ def validate_candles(frame: pl.DataFrame) -> QualityReport:
         issues.append("Column ts contains null values")
 
     for column in ("open", "high", "low", "close"):
+        if not frame[column].dtype.is_numeric():
+            issues.append(f"Column {column} must be numeric")
+            continue
+        if frame.select((~pl.col(column).is_finite()).sum()).item():
+            issues.append(f"Column {column} contains non-finite values")
         nulls = _null_count(frame, column)
         if nulls > 0:
             issues.append(f"Column {column} contains {nulls} null values")
@@ -76,6 +81,16 @@ def validate_candles(frame: pl.DataFrame) -> QualityReport:
 
     if ts_nulls == 0 and not frame.get_column("ts").is_sorted():
         issues.append("Rows are not sorted by ts")
+
+    if any(not frame[column].dtype.is_numeric() for column in ("open", "high", "low", "close")):
+        return QualityReport(
+            passed=False,
+            row_count=row_count,
+            min_ts=min_ts,
+            max_ts=max_ts,
+            duplicate_count=duplicate_count,
+            issues=issues,
+        )
 
     comparisons = (
         ("high must be greater than or equal to open", pl.col("high") < pl.col("open")),

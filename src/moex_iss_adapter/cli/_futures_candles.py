@@ -17,6 +17,7 @@ from moex_iss_adapter.cli.common import (
 from moex_iss_adapter.constants import (
     DEFAULT_TIMEFRAME,
 )
+from moex_iss_adapter.downloads.futures import download_futures_candles
 from moex_iss_adapter.exceptions import MoexIssAdapterError
 
 
@@ -40,7 +41,7 @@ def futures_candles(
 
     configure_logging(verbose)
     try:
-        result = _public_cli_module().download_futures_candles(
+        result = download_futures_candles(
             symbol=symbol,
             board=board,
             timeframe=timeframe,
@@ -56,9 +57,3 @@ def futures_candles(
         raise typer.Exit(code=1) from exc
 
     print_download_result(result)
-
-
-def _public_cli_module():
-    from moex_iss_adapter.cli import futures
-
-    return futures

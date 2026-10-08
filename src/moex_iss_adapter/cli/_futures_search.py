@@ -19,8 +19,11 @@ from moex_iss_adapter.constants import (
     DEFAULT_FUTURES_MARKET,
 )
 from moex_iss_adapter.downloads.futures import (
+    search_futures_securities,
     search_saved_futures_metadata,
 )
+from moex_iss_adapter.downloads.futures_history import search_historical_futures_contracts
+from moex_iss_adapter.downloads.futures_metadata import save_futures_metadata_snapshot
 from moex_iss_adapter.exceptions import MoexIssAdapterError
 from moex_iss_adapter.futures_history import contract_is_expired
 
@@ -64,7 +67,7 @@ def futures_search(
     configure_logging(verbose)
     try:
         if include_expired:
-            results = _public_cli_module().search_historical_futures_contracts(
+            results = search_historical_futures_contracts(
                 query=query or secid or asset_code or secid_prefix or "",
                 secid_prefix=secid_prefix,
                 asset_code=asset_code,
@@ -86,7 +89,7 @@ def futures_search(
                     security_name=security_name,
                 )
                 if metadata_path is not None
-                else _public_cli_module().search_futures_securities(
+                else search_futures_securities(
                     query=query,
                     secid=secid,
                     asset_code=asset_code,
@@ -161,7 +164,7 @@ def futures_snapshot(
 
     configure_logging(verbose)
     try:
-        result = _public_cli_module().save_futures_metadata_snapshot(
+        result = save_futures_metadata_snapshot(
             save_raw=save_raw,
             save_normalized=save_normalized,
             data_root=data_root,
@@ -172,9 +175,3 @@ def futures_snapshot(
         raise typer.Exit(code=1) from exc
 
     print_metadata_snapshot_result(result)
-
-
-def _public_cli_module():
-    from moex_iss_adapter.cli import futures
-
-    return futures

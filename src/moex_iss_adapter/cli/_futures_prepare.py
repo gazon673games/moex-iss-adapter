@@ -20,6 +20,7 @@ from moex_iss_adapter.constants import (
 from moex_iss_adapter.diagnostics import (
     write_intraday_coverage_report,
 )
+from moex_iss_adapter.downloads.futures_bulk import prepare_futures_chain_data
 from moex_iss_adapter.exceptions import MoexIssAdapterError
 
 
@@ -103,7 +104,7 @@ def futures_prepare_chain_data(
 
     configure_logging(verbose)
     try:
-        result = _public_cli_module().prepare_futures_chain_data(
+        result = prepare_futures_chain_data(
             query=query,
             timeframe=timeframe,
             from_date=from_date,
@@ -153,9 +154,3 @@ def futures_prepare_chain_data(
             err=True,
         )
         raise typer.Exit(code=1)
-
-
-def _public_cli_module():
-    from moex_iss_adapter.cli import futures
-
-    return futures
